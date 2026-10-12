@@ -43,6 +43,11 @@ public class CustomerOrder {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal total = BigDecimal.ZERO;
 
+    /** 下单时的结算币种；老订单为空，视为人民币。 */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 3)
+    private Currency currency;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private OrderStatus status = OrderStatus.PLACED;
@@ -109,6 +114,14 @@ public class CustomerOrder {
 
     public BigDecimal getTotal() {
         return total;
+    }
+
+    public Currency getCurrency() {
+        return currency == null ? Currency.CNY : currency;
+    }
+
+    public void setCurrency(Currency currency) {
+        this.currency = currency;
     }
 
     public OrderStatus getStatus() {

@@ -9,20 +9,22 @@
 
     <form class="card actions" th:action="@{/admin/categories}" method="post">
         <input name="name" placeholder="新分类名称" required maxlength="50">
+        <input name="nameEn" placeholder="英文名（可选）" maxlength="50">
         <input name="sortOrder" type="number" value="0" style="width:100px" title="排序，数字越小越靠前">
         <button type="submit">添加分类</button>
     </form>
 
     <div class="table-wrap card" style="padding:0">
         <table>
-            <thead><tr><th>名称</th><th>排序</th><th class="num">商品数</th><th></th></tr></thead>
+            <thead><tr><th>名称</th><th>英文名</th><th>排序</th><th class="num">商品数</th><th></th></tr></thead>
             <tbody>
-            <tr th:if="${categories.isEmpty()}"><td colspan="4" class="center muted">还没有分类</td></tr>
+            <tr th:if="${categories.isEmpty()}"><td colspan="5" class="center muted">还没有分类</td></tr>
             <tr th:each="entry : ${categories}" th:with="c=${entry.key}">
                 <td>
                     <form th:id="'cat-' + ${c.id}" th:action="@{/admin/categories/{id}(id=${c.id})}" method="post" class="inline"></form>
                     <input name="name" th:value="${c.name}" th:form="'cat-' + ${c.id}" required maxlength="50">
                 </td>
+                <td><input name="nameEn" th:value="${c.nameEn}" th:form="'cat-' + ${c.id}" maxlength="50" placeholder="英文前台显示"></td>
                 <td><input name="sortOrder" type="number" th:value="${c.sortOrder}" th:form="'cat-' + ${c.id}" style="width:90px"></td>
                 <td class="num"><a th:href="@{/admin/products(category=${c.id})}" th:text="${entry.value}"></a></td>
                 <td>

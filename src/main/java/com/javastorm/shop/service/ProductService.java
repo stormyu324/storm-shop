@@ -43,6 +43,12 @@ public class ProductService {
         return products.findAll(spec(keyword, status, categoryId), pageable);
     }
 
+    /** 导出用：不分页，按 ID 排序。 */
+    @Transactional(readOnly = true)
+    public List<Product> list(ProductStatus status, Long categoryId) {
+        return products.findAll(spec(null, status, categoryId), org.springframework.data.domain.Sort.by("id"));
+    }
+
     @Transactional(readOnly = true)
     public Page<Product> searchStorefront(String keyword, Long categoryId, Pageable pageable) {
         return search(keyword, ProductStatus.ON_SALE, categoryId, pageable);
@@ -78,6 +84,20 @@ public class ProductService {
         product.setDescription(form.getDescription());
         product.setStatus(form.getStatus());
         product.setImageUrls(imageUrls);
+        product.setParentSku(blankToNull(form.getParentSku()));
+        product.setTitleEn(blankToNull(form.getTitleEn()));
+        product.setDescriptionEn(blankToNull(form.getDescriptionEn()));
+        product.setBulletPointsEn(blankToNull(form.getBulletPointsEn()));
+        product.setBrand(blankToNull(form.getBrand()));
+        product.setColor(blankToNull(form.getColor()));
+        product.setSize(blankToNull(form.getSize()));
+        product.setMaterial(blankToNull(form.getMaterial()));
+        product.setWeightGrams(form.getWeightGrams());
+        product.setLengthCm(form.getLengthCm());
+        product.setWidthCm(form.getWidthCm());
+        product.setHeightCm(form.getHeightCm());
+        product.setBarcode(blankToNull(form.getBarcode()));
+        product.setPriceUsd(form.getPriceUsd());
         return products.save(product);
     }
 
@@ -109,7 +129,25 @@ public class ProductService {
         copy.setDescription(source.getDescription());
         copy.setStatus(ProductStatus.DRAFT);
         copy.setImageUrls(source.getImageUrls());
+        // 同款的变体通常共用款号、品牌、材质和英文资料，颜色/尺码/条码需要重新填写
+        copy.setParentSku(source.getParentSku());
+        copy.setTitleEn(source.getTitleEn());
+        copy.setDescriptionEn(source.getDescriptionEn());
+        copy.setBulletPointsEn(source.getBulletPointsEn());
+        copy.setBrand(source.getBrand());
+        copy.setColor(source.getColor());
+        copy.setSize(source.getSize());
+        copy.setMaterial(source.getMaterial());
+        copy.setWeightGrams(source.getWeightGrams());
+        copy.setLengthCm(source.getLengthCm());
+        copy.setWidthCm(source.getWidthCm());
+        copy.setHeightCm(source.getHeightCm());
+        copy.setPriceUsd(source.getPriceUsd());
         return products.save(copy);
+    }
+
+    static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
     }
 
     public String generateSku() {

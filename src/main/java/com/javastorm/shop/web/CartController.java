@@ -1,5 +1,6 @@
 package com.javastorm.shop.web;
 
+import com.javastorm.shop.config.LocaleConfig;
 import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.Product;
 import com.javastorm.shop.repository.ProductRepository;
@@ -9,6 +10,8 @@ import com.javastorm.shop.service.CartView;
 import com.javastorm.shop.service.OrderService;
 import com.javastorm.shop.web.form.CheckoutForm;
 import jakarta.validation.Valid;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -24,16 +27,21 @@ public class CartController {
     private final Cart cart;
     private final OrderService orderService;
     private final ProductRepository products;
+    private final MessageSource messages;
+    private final GlobalModelAdvice advice;
 
-    public CartController(Cart cart, OrderService orderService, ProductRepository products) {
+    public CartController(Cart cart, OrderService orderService, ProductRepository products,
+                          MessageSource messages, GlobalModelAdvice advice) {
         this.cart = cart;
         this.orderService = orderService;
         this.products = products;
+        this.messages = messages;
+        this.advice = advice;
     }
 
     @GetMapping("/cart")
     public String cart(Model model) {
-        model.addAttribute("cart", orderService.view(cart));
+        model.addAttribute("cart", view());
         return "store/cart";
     }
 
@@ -41,15 +49,17 @@ public class CartController {
     public String add(@RequestParam Long productId, @RequestParam(defaultValue = "1") int quantity,
                       @RequestParam(required = false) String buyNow, RedirectAttributes flash) {
         Product p = products.findById(productId).filter(Product::isOnSale)
-                .orElseThrow(() -> new BusinessException("商品不存在或已下架"));
+                .orElseThrow(() -> new BusinessException("error.product.notFound", "商品不存在或已下架"));
+        String title = p.title(LocaleConfig.isEnglish());
         if (p.getStock() <= 0) {
-            throw new BusinessException("「" + p.getName() + "」已售罄");
+            throw new BusinessException("error.product.soldOut", "「" + p.getName() + "」已售罄", title);
         }
         cart.add(productId, Math.max(quantity, 1));
         if (buyNow != null) {
             return "redirect:/checkout";
         }
-        flash.addFlashAttribute("message", "已加入购物车：" + p.getName());
+        flash.addFlashAttribute("message", messages.getMessage("cart.added", new Object[]{title},
+                LocaleContextHolder.getLocale()));
         return "redirect:/products/" + productId;
     }
 
@@ -67,7 +77,7 @@ public class CartController {
 
     @GetMapping("/checkout")
     public String checkout(Model model) {
-        CartView view = orderService.view(cart);
+        CartView view = view();
         if (view.isEmpty()) {
             return "redirect:/cart";
         }
@@ -79,7 +89,7 @@ public class CartController {
     @PostMapping("/checkout")
     public String placeOrder(@Valid @ModelAttribute("form") CheckoutForm form, BindingResult binding, Model model,
                              RedirectAttributes flash) {
-        CartView view = orderService.view(cart);
+        CartView view = view();
         if (view.isEmpty()) {
             return "redirect:/cart";
         }
@@ -88,13 +98,13 @@ public class CartController {
             return "store/checkout";
         }
         try {
-            CustomerOrder order = orderService.placeOrder(cart, form);
+            CustomerOrder order = orderService.placeOrder(cart, form, LocaleConfig.currentCurrency());
             // 通过 flash 传递，避免任何人凭订单号查看他人的收货信息
             flash.addFlashAttribute("order", order);
             return "redirect:/order-success";
         } catch (BusinessException e) {
-            model.addAttribute("cart", orderService.view(cart));
-            model.addAttribute("error", e.getMessage());
+            model.addAttribute("cart", view());
+            model.addAttribute("error", advice.message(e));
             return "store/checkout";
         }
     }
@@ -105,5 +115,9 @@ public class CartController {
             return "redirect:/";
         }
         return "store/order-success";
+    }
+
+    private CartView view() {
+        return orderService.view(cart, LocaleConfig.currentCurrency());
     }
 }

@@ -32,11 +32,11 @@ public class OrderItem {
     protected OrderItem() {
     }
 
-    public OrderItem(Product product, int quantity) {
+    public OrderItem(Product product, String productName, BigDecimal unitPrice, int quantity) {
         this.productId = product.getId();
-        this.productName = product.getName();
+        this.productName = productName;
         this.sku = product.getSku();
-        this.unitPrice = product.getPrice();
+        this.unitPrice = unitPrice;
         this.quantity = quantity;
     }
 

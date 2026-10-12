@@ -29,7 +29,7 @@
     <div class="card">
         <h2>第 1 步：下载模板并填写</h2>
         <p><a th:href="@{/admin/products/import/template.csv}" class="btn ghost">下载 CSV 模板</a></p>
-        <p class="muted">用 Excel / WPS 打开模板填写，完成后“另存为 CSV”格式。列说明：</p>
+        <p class="muted">用 Excel / WPS 打开模板填写，完成后“另存为 CSV”格式。只有名称和售价必填，用不到的列可以留空或删掉。表格里留空的单元格不会覆盖已有资料。也可以在“平台导出”页下载现有商品的通用资料表，改完再导回来。列说明：</p>
         <div class="table-wrap">
             <table>
                 <tr><th>名称</th><td>必填</td></tr>
@@ -41,6 +41,13 @@
                 <tr><th>状态</th><td>可选：上架 / 下架 / 草稿；留空使用下方的默认状态</td></tr>
                 <tr><th>图片</th><td>可选，图片网址，多张用 <code>|</code> 分隔，第一张为主图</td></tr>
                 <tr><th>描述</th><td>可选</td></tr>
+                <tr><th>英文标题 / 英文描述</th><td>可选，英文前台和导出平台时使用</td></tr>
+                <tr><th>英文卖点</th><td>可选，多条用 <code>|</code> 分隔，最多 5 条</td></tr>
+                <tr><th>美元售价</th><td>可选；留空时按汇率从人民币价格换算</td></tr>
+                <tr><th>品牌 / 颜色 / 尺码 / 材质</th><td>可选</td></tr>
+                <tr><th>款号</th><td>可选。同款不同颜色或尺码的商品填同一个款号，导出亚马逊时自动生成变体</td></tr>
+                <tr><th>重量(g) / 长宽高(cm)</th><td>可选，包装后的重量和尺寸</td></tr>
+                <tr><th>条码</th><td>可选，12 位 UPC、13 位 EAN 或 14 位 GTIN</td></tr>
             </table>
         </div>
     </div>

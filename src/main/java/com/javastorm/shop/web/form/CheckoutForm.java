@@ -6,15 +6,15 @@ import jakarta.validation.constraints.Size;
 
 public class CheckoutForm {
 
-    @NotBlank(message = "请填写收货人")
+    @NotBlank(message = "{checkout.name.required}")
     @Size(max = 50)
     private String customerName;
 
-    @NotBlank(message = "请填写手机号")
-    @Pattern(regexp = "^[0-9+\\- ]{6,30}$", message = "手机号格式不正确")
+    @NotBlank(message = "{checkout.phone.required}")
+    @Pattern(regexp = "^[0-9+()\\- ]{6,30}$", message = "{checkout.phone.invalid}")
     private String phone;
 
-    @NotBlank(message = "请填写收货地址")
+    @NotBlank(message = "{checkout.address.required}")
     @Size(max = 300)
     private String address;
 

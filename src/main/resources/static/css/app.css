@@ -373,6 +373,7 @@ a.stat:hover { text-decoration: none; color: var(--text); transform: translateY(
     body { font-size: 14.5px; }
     .container { padding: 0 16px; }
     .store-layout, .detail, .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .store-layout > *, .detail > * { min-width: 0; }
     .store-layout aside { position: static; }
     .side-title { display: none; }
     .side-cats { display: flex; gap: 4px; overflow-x: auto; padding: 6px; }
@@ -380,7 +381,9 @@ a.stat:hover { text-decoration: none; color: var(--text); transform: translateY(
     .side-cats a.active { box-shadow: none; }
     .product-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
     .topbar-inner { gap: 12px; }
-    .topnav { margin-left: auto; }
+    .topnav { margin-left: auto; gap: 2px; }
+    .topnav a, .topnav button.link { padding: 6px 8px; }
+    .nav-label { display: none; }
     .search { order: 3; flex-basis: 100%; max-width: none; min-width: 0; }
     .search input { min-width: 0; }
     .hero { padding: 28px 22px; border-radius: 20px; }
@@ -388,3 +391,22 @@ a.stat:hover { text-decoration: none; color: var(--text); transform: translateY(
     .card { padding: 18px; }
     .detail { gap: 20px; }
 }
+
+/* ===== 多语言 / 跨境 ===== */
+.lang-switch { font-family: var(--mono); font-size: .85rem !important; font-weight: 600; }
+.bullets { margin: 0 0 22px; padding-left: 20px; color: var(--text-2); }
+.bullets li { margin-bottom: 6px; }
+.bullets li::marker { color: var(--blue); }
+.readiness { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.readiness .item { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface-2); }
+.readiness .item .n { font-family: var(--mono); font-size: 1.3rem; font-weight: 700; }
+.readiness .item.ok .n { color: var(--success); }
+.readiness .item.warn .n { color: var(--warn); }
+.export-option { display: flex; gap: 18px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.export-option + .export-option { border-top: 1px solid var(--border); padding-top: 18px; margin-top: 18px; }
+.export-option p { margin: 4px 0 0; }
+details.section > summary { cursor: pointer; font-weight: 650; list-style: none; display: flex; align-items: center; gap: 8px; }
+details.section > summary::-webkit-details-marker { display: none; }
+details.section > summary::after { content: "展开"; margin-left: auto; font-size: .8rem; font-weight: 500; color: var(--primary); }
+details.section[open] > summary::after { content: "收起"; }
+details.section[open] > summary { margin-bottom: 16px; }

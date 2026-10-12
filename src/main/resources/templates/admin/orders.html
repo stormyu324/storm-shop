@@ -26,7 +26,7 @@
                 <td>
                     <div th:each="i : ${o.items}" th:text="${i.productName} + ' × ' + ${i.quantity}"></div>
                 </td>
-                <td class="num price" th:text="'¥' + ${#numbers.formatDecimal(o.total, 1, 2)}"></td>
+                <td class="num price" th:text="${@pricing.format(o.total, o.currency)}"></td>
                 <td>
                     <div th:text="${o.customerName} + '  ' + ${o.phone}"></div>
                     <div class="muted" style="font-size:.85rem" th:text="${o.address}"></div>

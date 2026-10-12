@@ -35,7 +35,9 @@ import java.util.Map;
 public class ProductImportService {
 
     /** 模板表头，同时接受这些列的英文别名。 */
-    public static final List<String> HEADERS = List.of("名称", "SKU", "分类", "售价", "原价", "库存", "状态", "图片", "描述");
+    public static final List<String> HEADERS = List.of("名称", "SKU", "分类", "售价", "原价", "库存", "状态", "图片", "描述",
+            "英文标题", "美元售价", "品牌", "款号", "颜色", "尺码", "材质", "重量(g)", "长(cm)", "宽(cm)", "高(cm)",
+            "条码", "英文卖点", "英文描述");
 
     private static final Map<String, String> ALIASES = Map.ofEntries(
             Map.entry("name", "名称"), Map.entry("商品名称", "名称"),
@@ -46,7 +48,17 @@ public class ProductImportService {
             Map.entry("stock", "库存"),
             Map.entry("status", "状态"),
             Map.entry("images", "图片"), Map.entry("image", "图片"), Map.entry("图片地址", "图片"),
-            Map.entry("description", "描述"), Map.entry("商品描述", "描述"));
+            Map.entry("description", "描述"), Map.entry("商品描述", "描述"),
+            Map.entry("title_en", "英文标题"), Map.entry("titleen", "英文标题"), Map.entry("english title", "英文标题"),
+            Map.entry("price_usd", "美元售价"), Map.entry("priceusd", "美元售价"), Map.entry("usd", "美元售价"),
+            Map.entry("brand", "品牌"),
+            Map.entry("parent_sku", "款号"), Map.entry("parentsku", "款号"), Map.entry("父sku", "款号"),
+            Map.entry("color", "颜色"), Map.entry("size", "尺码"), Map.entry("material", "材质"),
+            Map.entry("weight", "重量(g)"), Map.entry("重量", "重量(g)"), Map.entry("重量g", "重量(g)"),
+            Map.entry("length", "长(cm)"), Map.entry("width", "宽(cm)"), Map.entry("height", "高(cm)"),
+            Map.entry("barcode", "条码"), Map.entry("upc", "条码"), Map.entry("ean", "条码"),
+            Map.entry("bullet_points", "英文卖点"), Map.entry("bullets", "英文卖点"),
+            Map.entry("description_en", "英文描述"), Map.entry("descriptionen", "英文描述"));
 
     private static final Charset GB18030 = Charset.forName("GB18030");
 
@@ -76,7 +88,7 @@ public class ProductImportService {
     @Transactional
     public ImportResult importCsv(byte[] bytes, ProductStatus defaultStatus) {
         String text = decode(bytes);
-        if (text.startsWith("﻿")) {
+        if (text.startsWith("\uFEFF")) {
             text = text.substring(1);
         }
         int created = 0;
@@ -115,9 +127,11 @@ public class ProductImportService {
 
     /** 带 BOM 的 UTF-8 模板，Excel 打开不会乱码。 */
     public byte[] template() {
-        String csv = "﻿" + String.join(",", HEADERS) + "\r\n"
-                + "纯棉圆领T恤 白色 M码,TSHIRT-WHITE-M,服装,59.00,99.00,100,上架,https://example.com/a.jpg|https://example.com/b.jpg,100% 纯棉，透气舒适\r\n"
-                + "陶瓷马克杯,,家居,35,,50,,,\r\n";
+        String csv = "\uFEFF" + String.join(",", HEADERS) + "\r\n"
+                + "纯棉圆领T恤 白色 M码,TSHIRT-WHITE-M,服装,59.00,99.00,100,上架,https://example.com/a.jpg|https://example.com/b.jpg,100% 纯棉，透气舒适,"
+                + "Classic Cotton Crew Neck T-Shirt,12.99,StormWear,TSHIRT,White,M,100% Cotton,180,30,25,3,012345678905,"
+                + "SOFT & BREATHABLE: 100% cotton|CLASSIC FIT: true to size,Soft and breathable everyday tee.\r\n"
+                + "陶瓷马克杯,,家居,35,,50,,,,,,,,,,,,,,,,,\r\n";
         return csv.getBytes(StandardCharsets.UTF_8);
     }
 
@@ -182,8 +196,66 @@ public class ProductImportService {
         if (description != null && (!description.isEmpty() || isNew)) {
             product.setDescription(description);
         }
+        importCrossBorder(record, columns, product);
         products.save(product);
         return isNew;
+    }
+
+    /** 跨境 / 平台资料：单元格留空表示不修改。 */
+    private static void importCrossBorder(CSVRecord record, Map<String, String> columns, Product product) {
+        text(record, columns, "英文标题", 200).ifPresent(product::setTitleEn);
+        text(record, columns, "品牌", 100).ifPresent(product::setBrand);
+        text(record, columns, "款号", 64).ifPresent(product::setParentSku);
+        text(record, columns, "颜色", 50).ifPresent(product::setColor);
+        text(record, columns, "尺码", 50).ifPresent(product::setSize);
+        text(record, columns, "材质", 100).ifPresent(product::setMaterial);
+        text(record, columns, "英文描述", 10000).ifPresent(product::setDescriptionEn);
+        text(record, columns, "英文卖点", 2500).ifPresent(v -> product.setBulletPointsEn(
+                String.join("\n", Arrays.stream(v.split("[|\\n]")).map(String::trim).filter(x -> !x.isEmpty()).toList())));
+        text(record, columns, "条码", 14).ifPresent(v -> {
+            if (!v.matches("\\d{12,14}")) {
+                throw new BusinessException("条码「" + v + "」应为 12~14 位数字（UPC/EAN/GTIN）");
+            }
+            product.setBarcode(v);
+        });
+        BigDecimal usd = decimal(value(record, columns, "美元售价"), "美元售价");
+        if (usd != null) {
+            product.setPriceUsd(usd);
+        }
+        String weight = value(record, columns, "重量(g)");
+        if (StringUtils.hasText(weight)) {
+            try {
+                int w = new BigDecimal(weight).setScale(0, java.math.RoundingMode.HALF_UP).intValueExact();
+                if (w < 0) {
+                    throw new BusinessException("重量不能为负数");
+                }
+                product.setWeightGrams(w);
+            } catch (ArithmeticException | NumberFormatException e) {
+                throw new BusinessException("重量「" + weight + "」不是有效数字（单位：克）");
+            }
+        }
+        BigDecimal length = dimension(value(record, columns, "长(cm)"), "长");
+        BigDecimal width = dimension(value(record, columns, "宽(cm)"), "宽");
+        BigDecimal height = dimension(value(record, columns, "高(cm)"), "高");
+        if (length != null) product.setLengthCm(length);
+        if (width != null) product.setWidthCm(width);
+        if (height != null) product.setHeightCm(height);
+    }
+
+    private static java.util.Optional<String> text(CSVRecord record, Map<String, String> columns, String key, int max) {
+        String v = value(record, columns, key);
+        if (!StringUtils.hasText(v)) {
+            return java.util.Optional.empty();
+        }
+        if (v.length() > max) {
+            throw new BusinessException(key + "超过 " + max + " 个字符");
+        }
+        return java.util.Optional.of(v);
+    }
+
+    private static BigDecimal dimension(String text, String field) {
+        BigDecimal v = decimal(text, field);
+        return v == null ? null : v.setScale(1, java.math.RoundingMode.HALF_UP);
     }
 
     private static Map<String, String> resolveColumns(List<String> headerNames) {

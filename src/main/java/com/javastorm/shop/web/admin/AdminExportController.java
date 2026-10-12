@@ -1,0 +1,98 @@
+package com.javastorm.shop.web.admin;
+
+import com.javastorm.shop.domain.Product;
+import com.javastorm.shop.domain.ProductStatus;
+import com.javastorm.shop.repository.CategoryRepository;
+import com.javastorm.shop.service.ProductExportService;
+import com.javastorm.shop.service.ProductService;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.util.List;
+
+/** 导出商品到亚马逊 / SHEIN 等平台的批量上架表格。 */
+@Controller
+@RequestMapping("/admin/export")
+public class AdminExportController {
+
+    private final ProductService productService;
+    private final ProductExportService exportService;
+    private final CategoryRepository categories;
+    private final String publicBaseUrl;
+
+    public AdminExportController(ProductService productService, ProductExportService exportService,
+                                 CategoryRepository categories,
+                                 @Value("${shop.public-base-url:}") String publicBaseUrl) {
+        this.productService = productService;
+        this.exportService = exportService;
+        this.categories = categories;
+        this.publicBaseUrl = publicBaseUrl;
+    }
+
+    @GetMapping
+    public String page(@RequestParam(defaultValue = "ON_SALE") String status,
+                       @RequestParam(required = false) Long category, Model model) {
+        List<Product> list = productService.list(parseStatus(status), category);
+        String baseUrl = baseUrl();
+        model.addAttribute("readiness", exportService.check(list));
+        model.addAttribute("statuses", ProductStatus.values());
+        model.addAttribute("categories", categories.findAllByOrderBySortOrderAscIdAsc());
+        model.addAttribute("status", status);
+        model.addAttribute("category", category);
+        model.addAttribute("baseUrl", baseUrl);
+        model.addAttribute("localBaseUrl", isLocal(baseUrl));
+        model.addAttribute("baseUrlConfigured", StringUtils.hasText(publicBaseUrl));
+        return "admin/export";
+    }
+
+    @GetMapping("/amazon.csv")
+    public ResponseEntity<byte[]> amazon(@RequestParam(defaultValue = "ON_SALE") String status,
+                                         @RequestParam(required = false) Long category) {
+        List<Product> list = productService.list(parseStatus(status), category);
+        return download("amazon-" + LocalDate.now() + ".csv", exportService.amazon(list, baseUrl()));
+    }
+
+    @GetMapping("/products.csv")
+    public ResponseEntity<byte[]> generic(@RequestParam(defaultValue = "ON_SALE") String status,
+                                          @RequestParam(required = false) Long category) {
+        List<Product> list = productService.list(parseStatus(status), category);
+        return download("商品资料-" + LocalDate.now() + ".csv", exportService.generic(list, baseUrl()));
+    }
+
+    /** 空字符串表示全部状态。 */
+    private static ProductStatus parseStatus(String status) {
+        return StringUtils.hasText(status) ? ProductStatus.valueOf(status) : null;
+    }
+
+    private String baseUrl() {
+        if (StringUtils.hasText(publicBaseUrl)) {
+            return publicBaseUrl.trim();
+        }
+        return ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString();
+    }
+
+    private static boolean isLocal(String url) {
+        String u = url.toLowerCase();
+        return u.contains("://localhost") || u.contains("://127.") || u.contains("://192.168.") || u.contains("://10.");
+    }
+
+    private static ResponseEntity<byte[]> download(String filename, byte[] body) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(filename, StandardCharsets.UTF_8).build().toString())
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .body(body);
+    }
+}

@@ -32,20 +32,32 @@ public class DemoDataInitializer implements ApplicationRunner {
         if (categories.count() > 0 || products.count() > 0) {
             return;
         }
-        Category clothing = categories.save(new Category("服装"));
-        Category home = categories.save(new Category("家居"));
-        Category digital = categories.save(new Category("数码"));
+        Category clothing = category("服装", "Apparel");
+        Category home = category("家居", "Home");
+        Category digital = category("数码", "Electronics");
 
-        product("纯棉圆领T恤", "DEMO-001", clothing, "59.00", "99.00", 120, "100% 纯棉面料，柔软透气，四季百搭。");
-        product("休闲牛仔裤", "DEMO-002", clothing, "159.00", null, 60, "经典直筒版型，弹力舒适。");
-        product("陶瓷马克杯", "DEMO-003", home, "35.00", "45.00", 200, "高温烧制，容量 350ml，可微波炉加热。");
-        product("北欧风抱枕", "DEMO-004", home, "49.00", null, 80, "可拆洗外套，填充饱满。");
-        product("无线蓝牙耳机", "DEMO-005", digital, "199.00", "299.00", 40, "蓝牙 5.3，续航 30 小时。");
-        product("快充数据线", "DEMO-006", digital, "29.90", null, 3, "支持 60W 快充，编织线身更耐用。");
+        product("纯棉圆领T恤", "DEMO-001", clothing, "59.00", "99.00", 120, "100% 纯棉面料，柔软透气，四季百搭。",
+                "Classic Cotton Crew Neck T-Shirt", "Soft, breathable 100% cotton tee for everyday wear.");
+        product("休闲牛仔裤", "DEMO-002", clothing, "159.00", null, 60, "经典直筒版型，弹力舒适。",
+                "Relaxed Straight-Leg Jeans", "Classic straight fit with comfortable stretch denim.");
+        product("陶瓷马克杯", "DEMO-003", home, "35.00", "45.00", 200, "高温烧制，容量 350ml，可微波炉加热。",
+                "Ceramic Coffee Mug 12 oz", "High-fired ceramic, 350 ml capacity, microwave safe.");
+        product("北欧风抱枕", "DEMO-004", home, "49.00", null, 80, "可拆洗外套，填充饱满。",
+                "Nordic Style Throw Pillow", "Removable washable cover with plush filling.");
+        product("无线蓝牙耳机", "DEMO-005", digital, "199.00", "299.00", 40, "蓝牙 5.3，续航 30 小时。",
+                "Wireless Bluetooth Earbuds", "Bluetooth 5.3 with up to 30 hours of battery life.");
+        product("快充数据线", "DEMO-006", digital, "29.90", null, 3, "支持 60W 快充，编织线身更耐用。",
+                "60W Fast Charging Cable", "Supports 60W fast charging with a durable braided design.");
+    }
+
+    private Category category(String name, String nameEn) {
+        Category c = new Category(name);
+        c.setNameEn(nameEn);
+        return categories.save(c);
     }
 
     private void product(String name, String sku, Category category, String price, String originalPrice,
-                         int stock, String description) {
+                         int stock, String description, String titleEn, String descriptionEn) {
         Product p = new Product();
         p.setName(name);
         p.setSku(sku);
@@ -54,6 +66,8 @@ public class DemoDataInitializer implements ApplicationRunner {
         p.setOriginalPrice(originalPrice == null ? null : new BigDecimal(originalPrice));
         p.setStock(stock);
         p.setDescription(description);
+        p.setTitleEn(titleEn);
+        p.setDescriptionEn(descriptionEn);
         p.setStatus(ProductStatus.ON_SALE);
         products.save(p);
     }

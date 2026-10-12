@@ -1,5 +1,6 @@
 package com.javastorm.shop;
 
+import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.OrderStatus;
 import com.javastorm.shop.domain.Product;
@@ -165,13 +166,13 @@ class ShopIntegrationTest {
         Cart cart = new Cart();
         cart.add(p.getId(), 3);
 
-        CustomerOrder order = orderService.placeOrder(cart, checkout());
+        CustomerOrder order = orderService.placeOrder(cart, checkout(), Currency.CNY);
         assertThat(order.getTotal()).isEqualByComparingTo("30.00");
         assertThat(products.findById(p.getId()).orElseThrow().getStock()).isEqualTo(2);
         assertThat(cart.isEmpty()).isTrue();
 
         cart.add(p.getId(), 3);
-        assertThatThrownBy(() -> orderService.placeOrder(cart, checkout()))
+        assertThatThrownBy(() -> orderService.placeOrder(cart, checkout(), Currency.CNY))
                 .isInstanceOf(BusinessException.class).hasMessageContaining("库存不足");
         assertThat(products.findById(p.getId()).orElseThrow().getStock()).isEqualTo(2);
 

@@ -39,8 +39,8 @@ public class AdminCategoryController {
     }
 
     @PostMapping
-    public String create(@RequestParam String name, @RequestParam(defaultValue = "0") int sortOrder,
-                         RedirectAttributes flash) {
+    public String create(@RequestParam String name, @RequestParam(required = false) String nameEn,
+                         @RequestParam(defaultValue = "0") int sortOrder, RedirectAttributes flash) {
         String n = name.trim();
         if (!StringUtils.hasText(n) || n.length() > 50) {
             flash.addFlashAttribute("error", "分类名称需为 1~50 个字");
@@ -48,6 +48,7 @@ public class AdminCategoryController {
             flash.addFlashAttribute("error", "分类「" + n + "」已存在");
         } else {
             Category c = new Category(n);
+            c.setNameEn(nameEn);
             c.setSortOrder(sortOrder);
             categories.save(c);
             flash.addFlashAttribute("message", "已添加分类「" + n + "」");
@@ -56,7 +57,8 @@ public class AdminCategoryController {
     }
 
     @PostMapping("/{id}")
-    public String update(@PathVariable Long id, @RequestParam String name, @RequestParam int sortOrder,
+    public String update(@PathVariable Long id, @RequestParam String name,
+                         @RequestParam(required = false) String nameEn, @RequestParam int sortOrder,
                          RedirectAttributes flash) {
         String n = name.trim();
         Category c = categories.findById(id).orElse(null);
@@ -68,6 +70,7 @@ public class AdminCategoryController {
             flash.addFlashAttribute("error", "分类「" + n + "」已存在");
         } else {
             c.setName(n);
+            c.setNameEn(nameEn);
             c.setSortOrder(sortOrder);
             categories.save(c);
             flash.addFlashAttribute("message", "已保存");
