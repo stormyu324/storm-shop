@@ -251,6 +251,10 @@ public class Product {
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
     }
+
+    public long getVersion() {
+        return version;
+    }
     public String getParentSku() {
         return parentSku;
     }

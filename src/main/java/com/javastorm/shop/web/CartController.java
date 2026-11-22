@@ -12,6 +12,7 @@ import com.javastorm.shop.web.form.CheckoutForm;
 import jakarta.validation.Valid;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -23,6 +24,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 public class CartController {
+
+    private static final int MAX_ORDER_ATTEMPTS = 3;
 
     private final Cart cart;
     private final OrderService orderService;
@@ -98,7 +101,7 @@ public class CartController {
             return "store/checkout";
         }
         try {
-            CustomerOrder order = orderService.placeOrder(cart, form, LocaleConfig.currentCurrency());
+            CustomerOrder order = placeOrderWithRetry(form);
             // 通过 flash 传递，避免任何人凭订单号查看他人的收货信息
             flash.addFlashAttribute("order", order);
             return "redirect:/order-success";
@@ -106,6 +109,22 @@ public class CartController {
             model.addAttribute("cart", view());
             model.addAttribute("error", advice.message(e));
             return "store/checkout";
+        }
+    }
+
+    /**
+     * 多人同时购买同一商品时，后提交的订单会遇到版本冲突。此时用最新库存重新下单：
+     * 库存还够就成功，不够就得到“库存不足”的正常提示。
+     */
+    private CustomerOrder placeOrderWithRetry(CheckoutForm form) {
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return orderService.placeOrder(cart, form, LocaleConfig.currentCurrency());
+            } catch (ObjectOptimisticLockingFailureException e) {
+                if (attempt >= MAX_ORDER_ATTEMPTS) {
+                    throw new BusinessException("error.order.busy", "下单人数较多，请稍后再试");
+                }
+            }
         }
     }
 

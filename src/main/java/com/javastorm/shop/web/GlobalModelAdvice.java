@@ -6,6 +6,7 @@ import com.javastorm.shop.service.BusinessException;
 import com.javastorm.shop.service.Cart;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -42,6 +43,13 @@ public class GlobalModelAdvice {
     @ExceptionHandler(BusinessException.class)
     public ModelAndView businessError(BusinessException e) {
         return errorPage(message(e));
+    }
+
+    /** 兜底：后台改订单状态、编辑商品时与下单等操作同时修改了同一条数据。 */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ModelAndView concurrentModification() {
+        return errorPage(messages.getMessage("error.concurrent", null, "数据刚被其他操作修改过，请刷新页面后重试",
+                LocaleContextHolder.getLocale()));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

@@ -17,6 +17,9 @@ public class ProductForm {
 
     private Long id;
 
+    /** 打开编辑页时商品的版本号，保存时用来发现期间被订单等改动过。 */
+    private Long version;
+
     @NotBlank(message = "请填写商品名称")
     @Size(max = 200, message = "名称最多 200 字")
     private String name;
@@ -92,6 +95,7 @@ public class ProductForm {
     public static ProductForm from(Product p) {
         ProductForm f = new ProductForm();
         f.id = p.getId();
+        f.version = p.getVersion();
         f.name = p.getName();
         f.sku = p.getSku();
         f.categoryId = p.getCategory() == null ? null : p.getCategory().getId();
@@ -135,6 +139,14 @@ public class ProductForm {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 
     public String getName() {

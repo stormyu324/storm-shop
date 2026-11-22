@@ -10,6 +10,8 @@ import com.javastorm.shop.repository.ProductRepository;
 import com.javastorm.shop.web.form.CheckoutForm;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -83,7 +85,13 @@ public class OrderService {
             order.addItem(new OrderItem(p, title, pricing.price(p, currency), qty));
         }
         CustomerOrder saved = orders.save(order);
-        cart.clear();
+        // 事务提交成功后才清空购物车；提交失败（例如并发抢购导致版本冲突）时顾客的购物车保持不变
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                cart.clear();
+            }
+        });
         return saved;
     }
 

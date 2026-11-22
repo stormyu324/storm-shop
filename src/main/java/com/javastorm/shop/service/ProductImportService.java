@@ -135,6 +135,10 @@ public class ProductImportService {
         return csv.getBytes(StandardCharsets.UTF_8);
     }
 
+    /**
+     * 先把整行解析、校验完，再写入商品。任何一项不合法都会在修改商品之前抛出，
+     * 保证报错的行不会有任何字段被保存（已有商品是受 JPA 管理的，改了就会在提交时写库）。
+     */
     private boolean importRow(CSVRecord record, Map<String, String> columns, ProductStatus defaultStatus) {
         String name = value(record, columns, "名称");
         if (!StringUtils.hasText(name)) {
@@ -161,8 +165,30 @@ public class ProductImportService {
             }
         }
         ProductStatus status = ProductStatus.parse(value(record, columns, "状态"));
-
         String sku = value(record, columns, "SKU");
+        if (sku != null && sku.length() > 64) {
+            throw new BusinessException("SKU 超过 64 个字符");
+        }
+        String categoryName = value(record, columns, "分类");
+        if (categoryName != null && categoryName.length() > 50) {
+            throw new BusinessException("分类名称超过 50 个字");
+        }
+        String imagesText = value(record, columns, "图片");
+        List<String> imageUrls = null;
+        if (StringUtils.hasText(imagesText)) {
+            imageUrls = Arrays.stream(imagesText.split("[|\\n]"))
+                    .map(String::trim).filter(s -> !s.isEmpty()).distinct().toList();
+            if (imageUrls.stream().anyMatch(u -> u.length() > 1000)) {
+                throw new BusinessException("图片地址超过 1000 个字符");
+            }
+        }
+        String description = value(record, columns, "描述");
+        if (description != null && description.length() > 10000) {
+            throw new BusinessException("描述超过 10000 字");
+        }
+        CrossBorder crossBorder = parseCrossBorder(record, columns);
+
+        // ---- 以下开始修改数据，不再抛出校验错误 ----
         Product product = StringUtils.hasText(sku) ? products.findBySku(sku).orElse(null) : null;
         boolean isNew = product == null;
         if (isNew) {
@@ -182,64 +208,81 @@ public class ProductImportService {
         if (status != null) {
             product.setStatus(status);
         }
-        String categoryName = value(record, columns, "分类");
         if (StringUtils.hasText(categoryName)) {
             product.setCategory(categories.findByName(categoryName)
                     .orElseGet(() -> categories.save(new Category(categoryName))));
         }
-        String imagesText = value(record, columns, "图片");
-        if (StringUtils.hasText(imagesText)) {
-            product.setImageUrls(Arrays.stream(imagesText.split("[|\\n]"))
-                    .map(String::trim).filter(s -> !s.isEmpty()).distinct().toList());
+        if (imageUrls != null) {
+            product.setImageUrls(imageUrls);
         }
-        String description = value(record, columns, "描述");
         if (description != null && (!description.isEmpty() || isNew)) {
             product.setDescription(description);
         }
-        importCrossBorder(record, columns, product);
+        crossBorder.applyTo(product);
         products.save(product);
         return isNew;
     }
 
-    /** 跨境 / 平台资料：单元格留空表示不修改。 */
-    private static void importCrossBorder(CSVRecord record, Map<String, String> columns, Product product) {
-        text(record, columns, "英文标题", 200).ifPresent(product::setTitleEn);
-        text(record, columns, "品牌", 100).ifPresent(product::setBrand);
-        text(record, columns, "款号", 64).ifPresent(product::setParentSku);
-        text(record, columns, "颜色", 50).ifPresent(product::setColor);
-        text(record, columns, "尺码", 50).ifPresent(product::setSize);
-        text(record, columns, "材质", 100).ifPresent(product::setMaterial);
-        text(record, columns, "英文描述", 10000).ifPresent(product::setDescriptionEn);
-        text(record, columns, "英文卖点", 2500).ifPresent(v -> product.setBulletPointsEn(
-                String.join("\n", Arrays.stream(v.split("[|\\n]")).map(String::trim).filter(x -> !x.isEmpty()).toList())));
-        text(record, columns, "条码", 14).ifPresent(v -> {
-            if (!v.matches("\\d{12,14}")) {
-                throw new BusinessException("条码「" + v + "」应为 12~14 位数字（UPC/EAN/GTIN）");
-            }
-            product.setBarcode(v);
-        });
-        BigDecimal usd = decimal(value(record, columns, "美元售价"), "美元售价");
-        if (usd != null) {
-            product.setPriceUsd(usd);
+    /** 跨境 / 平台资料，null 表示单元格留空、不修改。 */
+    private record CrossBorder(String titleEn, String brand, String parentSku, String color, String size,
+                               String material, String descriptionEn, String bulletPointsEn, String barcode,
+                               BigDecimal priceUsd, Integer weightGrams,
+                               BigDecimal lengthCm, BigDecimal widthCm, BigDecimal heightCm) {
+
+        void applyTo(Product p) {
+            if (titleEn != null) p.setTitleEn(titleEn);
+            if (brand != null) p.setBrand(brand);
+            if (parentSku != null) p.setParentSku(parentSku);
+            if (color != null) p.setColor(color);
+            if (size != null) p.setSize(size);
+            if (material != null) p.setMaterial(material);
+            if (descriptionEn != null) p.setDescriptionEn(descriptionEn);
+            if (bulletPointsEn != null) p.setBulletPointsEn(bulletPointsEn);
+            if (barcode != null) p.setBarcode(barcode);
+            if (priceUsd != null) p.setPriceUsd(priceUsd);
+            if (weightGrams != null) p.setWeightGrams(weightGrams);
+            if (lengthCm != null) p.setLengthCm(lengthCm);
+            if (widthCm != null) p.setWidthCm(widthCm);
+            if (heightCm != null) p.setHeightCm(heightCm);
         }
+    }
+
+    private static CrossBorder parseCrossBorder(CSVRecord record, Map<String, String> columns) {
+        String bullets = text(record, columns, "英文卖点", 2500)
+                .map(v -> String.join("\n", Arrays.stream(v.split("[|\\n]"))
+                        .map(String::trim).filter(x -> !x.isEmpty()).toList()))
+                .orElse(null);
+        String barcode = text(record, columns, "条码", 14).orElse(null);
+        if (barcode != null && !barcode.matches("\\d{12,14}")) {
+            throw new BusinessException("条码「" + barcode + "」应为 12~14 位数字（UPC/EAN/GTIN）");
+        }
+        Integer weightGrams = null;
         String weight = value(record, columns, "重量(g)");
         if (StringUtils.hasText(weight)) {
             try {
-                int w = new BigDecimal(weight).setScale(0, java.math.RoundingMode.HALF_UP).intValueExact();
-                if (w < 0) {
-                    throw new BusinessException("重量不能为负数");
-                }
-                product.setWeightGrams(w);
+                weightGrams = new BigDecimal(weight).setScale(0, java.math.RoundingMode.HALF_UP).intValueExact();
             } catch (ArithmeticException | NumberFormatException e) {
                 throw new BusinessException("重量「" + weight + "」不是有效数字（单位：克）");
             }
+            if (weightGrams < 0) {
+                throw new BusinessException("重量不能为负数");
+            }
         }
-        BigDecimal length = dimension(value(record, columns, "长(cm)"), "长");
-        BigDecimal width = dimension(value(record, columns, "宽(cm)"), "宽");
-        BigDecimal height = dimension(value(record, columns, "高(cm)"), "高");
-        if (length != null) product.setLengthCm(length);
-        if (width != null) product.setWidthCm(width);
-        if (height != null) product.setHeightCm(height);
+        return new CrossBorder(
+                text(record, columns, "英文标题", 200).orElse(null),
+                text(record, columns, "品牌", 100).orElse(null),
+                text(record, columns, "款号", 64).orElse(null),
+                text(record, columns, "颜色", 50).orElse(null),
+                text(record, columns, "尺码", 50).orElse(null),
+                text(record, columns, "材质", 100).orElse(null),
+                text(record, columns, "英文描述", 10000).orElse(null),
+                bullets,
+                barcode,
+                decimal(value(record, columns, "美元售价"), "美元售价"),
+                weightGrams,
+                dimension(value(record, columns, "长(cm)"), "长"),
+                dimension(value(record, columns, "宽(cm)"), "宽"),
+                dimension(value(record, columns, "高(cm)"), "高"));
     }
 
     private static java.util.Optional<String> text(CSVRecord record, Map<String, String> columns, String key, int max) {

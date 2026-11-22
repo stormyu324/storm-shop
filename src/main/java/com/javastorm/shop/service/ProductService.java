@@ -63,6 +63,11 @@ public class ProductService {
     @Transactional
     public Product save(ProductForm form, List<MultipartFile> uploads) {
         Product product = form.getId() == null ? new Product() : get(form.getId());
+        if (form.getId() != null && form.getVersion() != null && form.getVersion() != product.getVersion()) {
+            // 打开编辑页之后商品被改过（例如顾客下单扣了库存），直接保存会把库存等改动覆盖掉
+            throw new BusinessException("这个商品在你编辑期间被修改过（可能有新订单扣减了库存），"
+                    + "为避免覆盖，请重新打开编辑页再修改");
+        }
 
         String sku = StringUtils.hasText(form.getSku()) ? form.getSku().trim() : generateSku();
         products.findBySku(sku)
