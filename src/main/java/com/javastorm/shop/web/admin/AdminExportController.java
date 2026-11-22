@@ -71,9 +71,16 @@ public class AdminExportController {
         return download("商品资料-" + LocalDate.now() + ".csv", exportService.generic(list, baseUrl()));
     }
 
-    /** 空字符串表示全部状态。 */
+    /** 空字符串表示全部状态；无法识别的值按全部状态处理。 */
     private static ProductStatus parseStatus(String status) {
-        return StringUtils.hasText(status) ? ProductStatus.valueOf(status) : null;
+        if (!StringUtils.hasText(status)) {
+            return null;
+        }
+        try {
+            return ProductStatus.valueOf(status);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private String baseUrl() {
@@ -85,7 +92,7 @@ public class AdminExportController {
 
     private static boolean isLocal(String url) {
         String u = url.toLowerCase();
-        return u.contains("://localhost") || u.contains("://127.") || u.contains("://192.168.") || u.contains("://10.");
+        return u.matches("^https?://(localhost|127\\.|10\\.|192\\.168\\.|172\\.(1[6-9]|2\\d|3[01])\\.).*");
     }
 
     private static ResponseEntity<byte[]> download(String filename, byte[] body) {

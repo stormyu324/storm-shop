@@ -60,8 +60,7 @@ public class OrderService {
             throw new BusinessException("error.cart.empty", "购物车是空的");
         }
         CustomerOrder order = new CustomerOrder();
-        order.setOrderNo(LocalDateTime.now().format(ORDER_NO_TIME)
-                + String.format(Locale.ROOT, "%04d", ThreadLocalRandom.current().nextInt(10000)));
+        order.setOrderNo(generateOrderNo());
         order.setCustomerName(form.getCustomerName().trim());
         order.setPhone(form.getPhone().trim());
         order.setAddress(form.getAddress().trim());
@@ -95,6 +94,16 @@ public class OrderService {
         return saved;
     }
 
+    /** 时间 + 4 位随机数；同一秒内重复时重新生成。 */
+    private String generateOrderNo() {
+        String orderNo;
+        do {
+            orderNo = LocalDateTime.now().format(ORDER_NO_TIME)
+                    + String.format(Locale.ROOT, "%04d", ThreadLocalRandom.current().nextInt(10000));
+        } while (orders.existsByOrderNo(orderNo));
+        return orderNo;
+    }
+
     /** 修改订单状态；取消订单时把库存加回去。 */
     @Transactional
     public void changeStatus(Long orderId, OrderStatus status) {
@@ -102,8 +111,8 @@ public class OrderService {
         if (order.getStatus() == status) {
             return;
         }
-        if (order.getStatus() == OrderStatus.CANCELLED) {
-            throw new BusinessException("已取消的订单不能再修改状态");
+        if (!order.getStatus().canChangeTo(status)) {
+            throw new BusinessException("订单「" + order.getStatus().getLabel() + "」不能改为「" + status.getLabel() + "」");
         }
         if (status == OrderStatus.CANCELLED) {
             for (OrderItem item : order.getItems()) {

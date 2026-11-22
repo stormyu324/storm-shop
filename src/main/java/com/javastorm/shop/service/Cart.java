@@ -18,7 +18,7 @@ public class Cart implements Serializable {
     private final Map<Long, Integer> items = new LinkedHashMap<>();
 
     public void add(Long productId, int quantity) {
-        set(productId, items.getOrDefault(productId, 0) + quantity);
+        set(productId, (int) Math.min((long) items.getOrDefault(productId, 0) + quantity, MAX_QUANTITY));
     }
 
     public void set(Long productId, int quantity) {

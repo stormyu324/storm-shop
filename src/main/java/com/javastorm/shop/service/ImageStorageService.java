@@ -1,5 +1,7 @@
 package com.javastorm.shop.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -23,6 +25,8 @@ public class ImageStorageService {
     public static final String URL_PREFIX = "/uploads/";
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png", "gif", "webp");
 
+    private static final Logger log = LoggerFactory.getLogger(ImageStorageService.class);
+
     private final Path root;
 
     public ImageStorageService(@Value("${shop.upload-dir}") String uploadDir) {
@@ -44,6 +48,22 @@ public class ImageStorageService {
             }
         }
         return urls;
+    }
+
+    /** 删除本站上传目录里的图片文件；外部链接或不在上传目录内的路径会被忽略。 */
+    public void deleteIfLocal(String url) {
+        if (url == null || !url.startsWith(URL_PREFIX)) {
+            return;
+        }
+        Path file = root.resolve(url.substring(URL_PREFIX.length())).normalize();
+        if (!file.startsWith(root)) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(file);
+        } catch (IOException e) {
+            log.warn("删除图片失败：{}", file, e);
+        }
     }
 
     public String store(MultipartFile file) {

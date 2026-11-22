@@ -129,7 +129,13 @@ public class AdminProductController {
             n = productService.delete(ids);
             label = "删除";
         } else {
-            ProductStatus status = ProductStatus.valueOf(action);
+            ProductStatus status;
+            try {
+                status = ProductStatus.valueOf(action);
+            } catch (IllegalArgumentException e) {
+                flash.addFlashAttribute("error", "不支持的操作：" + action);
+                return "redirect:" + safeBack(back);
+            }
             n = productService.changeStatus(ids, status);
             label = status.getLabel();
         }

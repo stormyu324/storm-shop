@@ -34,10 +34,10 @@
                 </td>
                 <td><span class="tag" th:classappend="${o.status}" th:text="${o.status.label}"></span></td>
                 <td>
-                    <form th:unless="${o.status.name() == 'CANCELLED'}" th:action="@{/admin/orders/{id}/status(id=${o.id})}" method="post" class="actions"
+                    <form th:unless="${o.status.final}" th:action="@{/admin/orders/{id}/status(id=${o.id})}" method="post" class="actions"
                           onsubmit="return this.status.value !== 'CANCELLED' || confirm('取消订单会把库存加回去，确定吗？')">
                         <select name="status">
-                            <option th:each="s : ${statuses}" th:value="${s}" th:text="${s.label}" th:selected="${s == o.status}"></option>
+                            <option th:each="s : ${o.status.nextStatuses}" th:value="${s}" th:text="${s.label}"></option>
                         </select>
                         <button type="submit" class="small ghost">更新</button>
                     </form>

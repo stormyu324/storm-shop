@@ -12,6 +12,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -78,6 +80,8 @@ public class ProductService {
 
         List<String> imageUrls = new ArrayList<>(form.imageUrlList());
         imageUrls.addAll(images.storeAll(uploads));
+        List<String> removedImages = new ArrayList<>(product.getImageUrls());
+        removedImages.removeAll(imageUrls);
 
         product.setName(form.getName().trim());
         product.setSku(sku);
@@ -103,7 +107,9 @@ public class ProductService {
         product.setHeightCm(form.getHeightCm());
         product.setBarcode(blankToNull(form.getBarcode()));
         product.setPriceUsd(form.getPriceUsd());
-        return products.save(product);
+        Product saved = products.save(product);
+        deleteUnusedImagesAfterCommit(removedImages);
+        return saved;
     }
 
     @Transactional
@@ -116,7 +122,9 @@ public class ProductService {
     @Transactional
     public int delete(Collection<Long> ids) {
         List<Product> list = products.findAllById(ids);
+        List<String> imageUrls = list.stream().flatMap(p -> p.getImageUrls().stream()).distinct().toList();
         products.deleteAll(list);
+        deleteUnusedImagesAfterCommit(imageUrls);
         return list.size();
     }
 
@@ -149,6 +157,25 @@ public class ProductService {
         copy.setHeightCm(source.getHeightCm());
         copy.setPriceUsd(source.getPriceUsd());
         return products.save(copy);
+    }
+
+    /** 事务提交后，删除已经没有任何商品使用的本地图片文件（回滚时不删）。 */
+    private void deleteUnusedImagesAfterCommit(List<String> candidates) {
+        List<String> local = candidates.stream().filter(u -> u.startsWith(ImageStorageService.URL_PREFIX)).toList();
+        if (local.isEmpty()) {
+            return;
+        }
+        products.flush();
+        List<String> unused = local.stream().filter(u -> products.countUsingImage(u) == 0).toList();
+        if (unused.isEmpty()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                unused.forEach(images::deleteIfLocal);
+            }
+        });
     }
 
     static String blankToNull(String s) {
