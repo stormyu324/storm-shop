@@ -14,7 +14,7 @@
     <groupId>com.javastorm</groupId>
     <artifactId>shop</artifactId>
     <version>0.1.0</version>
-    <name>javastorm-shop</name>
+    <name>storm-shop</name>
     <description>电商网站：商城前台 + 商品管理后台</description>
 
     <properties>

@@ -7,8 +7,8 @@
 只需要安装 **JDK 21**（不用装 Maven 和数据库，项目自带 Maven Wrapper）。
 
 ```bash
-git clone https://github.com/stormyu324/javastorm.git
-cd javastorm
+git clone https://github.com/stormyu324/storm-shop.git
+cd storm-shop
 git checkout claude/determined-gauss-5n658i
 
 # macOS / Linux
