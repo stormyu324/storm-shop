@@ -14,6 +14,25 @@
             <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span th:text="#{hero.chip3}">无忧售后</span></span>
         </div>
     </section>
+    <section class="ai-shop card" th:if="${aiShopping and q == null and category == null and products.number == 0}"
+             th:attr="data-ai-thinking=#{ai.thinking},data-ai-error=#{ai.error},data-ai-empty=#{ai.empty},data-ai-from=#{ai.from}">
+        <div class="ai-head">
+            <span class="ai-badge">✨ AI</span>
+            <div>
+                <h2 th:text="#{ai.title}">AI 导购</h2>
+                <p class="muted" th:text="#{ai.subtitle}">说说你想买什么，AI 帮你从店里挑</p>
+            </div>
+        </div>
+        <form class="ai-form" data-ai-form>
+            <input name="query" maxlength="300" required th:placeholder="#{ai.placeholder}" autocomplete="off">
+            <button type="submit" th:text="#{ai.ask}">帮我挑</button>
+        </form>
+        <div class="ai-examples">
+            <button type="button" class="chip" th:each="ex : ${#strings.arraySplit(#messages.msg('ai.examples'), '|')}"
+                    th:text="${ex}" data-ai-example></button>
+        </div>
+        <div class="ai-result" data-ai-result hidden></div>
+    </section>
     <div class="store-layout">
         <aside>
             <p class="side-title" th:text="#{store.categories}">Categories</p>
@@ -75,5 +94,6 @@
     </div>
 </main>
 <footer th:replace="~{fragments/layout :: footer}"></footer>
+<script th:if="${aiShopping}" th:src="@{/js/ai-shop.js}" defer></script>
 </body>
 </html>

@@ -174,4 +174,13 @@ class StoreApiTest {
                 .andExpect(jsonPath("$.paths['/admin/products']").doesNotExist());
         mvc.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
     }
+
+    @Test
+    void aiAssistantHiddenWithoutApiKey() throws Exception {
+        mvc.perform(get("/api/recommendations/status")).andExpect(jsonPath("$.enabled").value(false));
+        mvc.perform(post("/api/recommendations").contentType(MediaType.APPLICATION_JSON).content("{\"query\":\"gift\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("AI 导购暂未开启"));
+        mvc.perform(get("/")).andExpect(content().string(not(containsString("data-ai-form"))));
+    }
 }

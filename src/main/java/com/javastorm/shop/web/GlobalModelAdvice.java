@@ -5,6 +5,7 @@ import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.payment.StripePaymentService;
 import com.javastorm.shop.service.BusinessException;
 import com.javastorm.shop.service.Cart;
+import com.javastorm.shop.service.RecommendationService;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -21,11 +22,14 @@ public class GlobalModelAdvice {
     private final Cart cart;
     private final MessageSource messages;
     private final StripePaymentService stripe;
+    private final RecommendationService recommendations;
 
-    public GlobalModelAdvice(Cart cart, MessageSource messages, StripePaymentService stripe) {
+    public GlobalModelAdvice(Cart cart, MessageSource messages, StripePaymentService stripe,
+                             RecommendationService recommendations) {
         this.cart = cart;
         this.messages = messages;
         this.stripe = stripe;
+        this.recommendations = recommendations;
     }
 
     @ModelAttribute("cartCount")
@@ -42,6 +46,12 @@ public class GlobalModelAdvice {
     @ModelAttribute("currency")
     public Currency currency() {
         return LocaleConfig.currentCurrency();
+    }
+
+    /** 是否显示 AI 导购。 */
+    @ModelAttribute("aiShopping")
+    public boolean aiShopping() {
+        return recommendations.isEnabled();
     }
 
     /** 当前币种是否走 Stripe 在线支付（结账页的提示和按钮文字用）。 */

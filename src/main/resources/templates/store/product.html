@@ -57,6 +57,11 @@
                 <button type="submit" name="buyNow" value="1" th:text="#{product.buyNow}">立即购买</button>
             </form>
             <p th:if="${product.stock <= 0}"><button disabled class="ghost" th:text="#{product.soldOut}">已售罄</button></p>
+            <div class="ai-pair" th:if="${aiShopping}"
+                 th:attr="data-ai-thinking=#{ai.thinking},data-ai-error=#{ai.error},data-ai-empty=#{ai.empty},data-ai-from=#{ai.from},data-product-id=${product.id}">
+                <button type="button" class="ghost small" data-ai-pair th:text="#{ai.pairing}">✨ AI 推荐搭配</button>
+                <div class="ai-result" data-ai-result hidden></div>
+            </div>
             <hr class="divider">
             <th:block th:if="${en and !product.bulletPointList.isEmpty()}">
                 <h2 th:text="#{product.highlights}">商品亮点</h2>
@@ -70,6 +75,7 @@
     </div>
 </main>
 <footer th:replace="~{fragments/layout :: footer}"></footer>
+<script th:if="${aiShopping}" th:src="@{/js/ai-shop.js}" defer></script>
 <script>
     document.querySelectorAll('.gallery .thumbs img').forEach(function (img) {
         img.addEventListener('click', function () {
