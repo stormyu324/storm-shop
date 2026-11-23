@@ -131,6 +131,17 @@ git clone https://github.com/stormyu324/storm-shop.git
 
 默认只有美元订单走 Stripe；如果你的 Stripe 账户支持人民币收款，可以设置 `STRIPE_CURRENCIES=USD,CNY`。
 
+## 接口（REST API）
+
+除了网页，系统还提供一套 JSON 接口，可用于 App、小程序或单独开发的前端。启动后浏览器打开 **http://localhost:8080/swagger-ui.html** 查看接口文档并在线调试。
+
+- **公开接口** `/api/...`：商品列表 / 详情（含颜色尺码规格）、分类、国家列表、运费试算、下单（开通 Stripe 时返回付款链接）。语言用 `lang=zh|en`，币种用 `currency=CNY|USD`。
+- **后台接口** `/api/admin/...`：商品增删改查、图片上传、CSV 导入、批量上下架、订单、分类、运费、数据概览、AI 生成英文资料。
+  登录方式：`GET /api/admin/session` 获取 CSRF 令牌（Cookie `XSRF-TOKEN`）→ `POST /api/admin/session` 登录 → 之后修改类请求在请求头 `X-XSRF-TOKEN` 带上令牌。在接口文档页调试时，先在另一个标签页登录 `/admin` 即可。
+- 出错统一返回 `{"message": "...", "fields": {...}}`，状态码：400 格式或字段错误、401 未登录、403 无权限或缺 CSRF 令牌、404 不存在、409 数据刚被修改、422 业务规则不允许（如库存不足）。
+
+正式环境模式（`SPRING_PROFILES_ACTIVE=prod`）默认不公开接口文档，需要时设置 `API_DOCS=true`。
+
 ## 配置（环境变量）
 
 | 变量 | 默认值 | 说明 |

@@ -14,7 +14,8 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.ModelAndView;
 
-@ControllerAdvice
+/** 只作用于网页（web 包），接口（api 包）有自己的错误处理。 */
+@ControllerAdvice(basePackages = "com.javastorm.shop.web")
 public class GlobalModelAdvice {
 
     private final Cart cart;

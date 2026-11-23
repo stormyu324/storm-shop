@@ -1,9 +1,6 @@
 package com.javastorm.shop.web.admin;
 
-import com.javastorm.shop.domain.OrderStatus;
-import com.javastorm.shop.domain.ProductStatus;
-import com.javastorm.shop.repository.OrderRepository;
-import com.javastorm.shop.repository.ProductRepository;
+import com.javastorm.shop.service.DashboardService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,24 +8,21 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class AdminDashboardController {
 
-    static final int LOW_STOCK = 5;
+    private final DashboardService dashboard;
 
-    private final ProductRepository products;
-    private final OrderRepository orders;
-
-    public AdminDashboardController(ProductRepository products, OrderRepository orders) {
-        this.products = products;
-        this.orders = orders;
+    public AdminDashboardController(DashboardService dashboard) {
+        this.dashboard = dashboard;
     }
 
     @GetMapping("/admin")
     public String dashboard(Model model) {
-        model.addAttribute("onSale", products.countByStatus(ProductStatus.ON_SALE));
-        model.addAttribute("drafts", products.countByStatus(ProductStatus.DRAFT));
-        model.addAttribute("offShelf", products.countByStatus(ProductStatus.OFF_SHELF));
-        model.addAttribute("lowStock", products.countByStockLessThanEqualAndStatus(LOW_STOCK, ProductStatus.ON_SALE));
-        model.addAttribute("pendingOrders", orders.countByStatusIn(OrderStatus.toFulfil()));
-        model.addAttribute("lowStockThreshold", LOW_STOCK);
+        DashboardService.Stats s = dashboard.stats();
+        model.addAttribute("onSale", s.onSale());
+        model.addAttribute("drafts", s.drafts());
+        model.addAttribute("offShelf", s.offShelf());
+        model.addAttribute("lowStock", s.lowStock());
+        model.addAttribute("pendingOrders", s.ordersToFulfil());
+        model.addAttribute("lowStockThreshold", s.lowStockThreshold());
         return "admin/dashboard";
     }
 }

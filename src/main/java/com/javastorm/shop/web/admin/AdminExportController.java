@@ -6,7 +6,7 @@ import com.javastorm.shop.repository.CategoryRepository;
 import com.javastorm.shop.service.ListingAiService;
 import com.javastorm.shop.service.ProductExportService;
 import com.javastorm.shop.service.ProductService;
-import org.springframework.beans.factory.annotation.Value;
+import com.javastorm.shop.service.SiteUrls;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -17,7 +17,6 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -31,17 +30,16 @@ public class AdminExportController {
     private final ProductService productService;
     private final ProductExportService exportService;
     private final CategoryRepository categories;
-    private final String publicBaseUrl;
+    private final SiteUrls siteUrls;
     private final ListingAiService listingAi;
 
     public AdminExportController(ProductService productService, ProductExportService exportService,
-                                 CategoryRepository categories, ListingAiService listingAi,
-                                 @Value("${shop.public-base-url:}") String publicBaseUrl) {
+                                 CategoryRepository categories, ListingAiService listingAi, SiteUrls siteUrls) {
         this.productService = productService;
         this.exportService = exportService;
         this.categories = categories;
         this.listingAi = listingAi;
-        this.publicBaseUrl = publicBaseUrl;
+        this.siteUrls = siteUrls;
     }
 
     @GetMapping
@@ -55,8 +53,8 @@ public class AdminExportController {
         model.addAttribute("status", status);
         model.addAttribute("category", category);
         model.addAttribute("baseUrl", baseUrl);
-        model.addAttribute("localBaseUrl", isLocal(baseUrl));
-        model.addAttribute("baseUrlConfigured", StringUtils.hasText(publicBaseUrl));
+        model.addAttribute("localBaseUrl", SiteUrls.isLocal(baseUrl));
+        model.addAttribute("baseUrlConfigured", siteUrls.isConfigured());
         model.addAttribute("aiEnabled", listingAi.isEnabled());
         return "admin/export";
     }
@@ -88,15 +86,7 @@ public class AdminExportController {
     }
 
     private String baseUrl() {
-        if (StringUtils.hasText(publicBaseUrl)) {
-            return publicBaseUrl.trim();
-        }
-        return ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString();
-    }
-
-    private static boolean isLocal(String url) {
-        String u = url.toLowerCase();
-        return u.matches("^https?://(localhost|127\\.|10\\.|192\\.168\\.|172\\.(1[6-9]|2\\d|3[01])\\.).*");
+        return siteUrls.baseUrl();
     }
 
     private static ResponseEntity<byte[]> download(String filename, byte[] body) {
