@@ -296,6 +296,7 @@ input[type=file]::file-selector-button {
 /* AI 生成英文资料 */
 .ai-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 16px; }
 .ai-bar .muted { font-size: .85rem; }
+.free-hint { color: var(--success); font-size: .88rem; }
 
 /* ===== 商品详情 ===== */
 .crumbs { font-size: .88rem; color: var(--muted); margin-bottom: 16px; }

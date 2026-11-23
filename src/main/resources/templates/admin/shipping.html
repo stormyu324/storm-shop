@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('运费设置')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: adminHeader('shipping')}"></header>
+<main class="container" style="max-width:900px">
+    <h1>运费设置</h1>
+    <p class="muted">中文前台按人民币、英文前台按美元结算，两边分别设置。运费 = 首重运费 + 超出首重后每公斤加价（不足 1 公斤按 1 公斤）；
+        商品金额达到包邮门槛时免运费。重量取商品资料里的“重量（克）”，没填的商品按 0 克计算。</p>
+    <div th:replace="~{fragments/layout :: flash}"></div>
+
+    <div class="grid-2">
+        <form class="card" th:each="entry : ${rules}" th:with="c=${entry.key}, r=${entry.value}, sym=${entry.key.symbol}"
+              th:action="@{/admin/shipping/{c}(c=${c})}" method="post">
+            <h2 th:text="${c.name() == 'USD'} ? '美元（英文前台）' : '人民币（中文前台）'">人民币</h2>
+            <label style="font-weight:400;display:block;margin-bottom:14px">
+                <input type="checkbox" name="enabled" value="true" th:checked="${r.enabled}"> 启用运费（不勾选则全部包邮）
+            </label>
+            <div class="field">
+                <label th:text="'首重运费（' + ${sym} + '）'">首重运费</label>
+                <input name="baseFee" type="number" step="0.01" min="0" th:value="${r.baseFee}">
+            </div>
+            <div class="field">
+                <label>首重包含重量（克）</label>
+                <input name="includedGrams" type="number" min="0" th:value="${r.includedGrams}">
+            </div>
+            <div class="field">
+                <label th:text="'续重：超出后每公斤加价（' + ${sym} + '）'">续重</label>
+                <input name="extraPerKg" type="number" step="0.01" min="0" th:value="${r.extraPerKg}" placeholder="留空则不按重量加价">
+            </div>
+            <div class="field">
+                <label th:text="'包邮门槛：商品金额满（' + ${sym} + '）'">包邮门槛</label>
+                <input name="freeThreshold" type="number" step="0.01" min="0" th:value="${r.freeThreshold}" placeholder="留空则不包邮">
+            </div>
+            <button type="submit">保存</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>举例</h2>
+        <p class="muted" style="margin:0">美元规则设为：首重运费 $5.99、首重 1000 克、续重每公斤 $2.00、满 $49 包邮。
+            顾客买了 2.3 公斤、共 $30 的商品：运费 = 5.99 + 2 × 2.00（超出 1.3 公斤按 2 公斤）= $9.99；购物车会提示“再买 $19.00 即可包邮”。</p>
+    </div>
+</main>
+</body>
+</html>

@@ -26,7 +26,11 @@
                 <td>
                     <div th:each="i : ${o.items}" th:text="${i.productName} + ' × ' + ${i.quantity}"></div>
                 </td>
-                <td class="num price" th:text="${@pricing.format(o.total, o.currency)}"></td>
+                <td class="num">
+                    <div class="price" th:text="${@pricing.format(o.total, o.currency)}"></div>
+                    <div class="muted" style="font-size:.8rem" th:if="${o.shippingFee.signum() > 0}"
+                         th:text="'含运费 ' + ${@pricing.format(o.shippingFee, o.currency)}"></div>
+                </td>
                 <td>
                     <div th:text="${o.customerName} + '  ' + ${o.phone}"></div>
                     <div class="muted" style="font-size:.85rem" th:text="${o.address}"></div>

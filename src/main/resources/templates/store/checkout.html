@@ -15,6 +15,10 @@
                 <td class="num" th:text="${@pricing.format(line.subtotal, cart.currency)}"></td>
             </tr>
             <tr>
+                <td colspan="2" class="num muted" th:text="#{checkout.shippingFee}">运费</td>
+                <td class="num" th:text="${cart.shipping.signum() == 0} ? #{cart.shippingFree} : ${@pricing.format(cart.shipping, cart.currency)}"></td>
+            </tr>
+            <tr>
                 <td colspan="2" class="num"><strong th:text="#{checkout.total}">合计</strong></td>
                 <td class="num price" th:text="${@pricing.format(cart.total, cart.currency)}"></td>
             </tr>

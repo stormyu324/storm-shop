@@ -36,17 +36,20 @@ public class OrderService {
     private final ProductRepository products;
     private final OrderRepository orders;
     private final Pricing pricing;
+    private final ShippingService shipping;
 
-    public OrderService(ProductRepository products, OrderRepository orders, Pricing pricing) {
+    public OrderService(ProductRepository products, OrderRepository orders, Pricing pricing, ShippingService shipping) {
         this.products = products;
         this.orders = orders;
         this.pricing = pricing;
+        this.shipping = shipping;
     }
 
     @Transactional(readOnly = true)
     public CartView view(Cart cart, Currency currency) {
         List<CartView.Line> lines = new ArrayList<>();
-        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal subtotal = BigDecimal.ZERO;
+        int weight = 0;
         for (Map.Entry<Long, Integer> e : cart.getItems().entrySet()) {
             Product p = products.findById(e.getKey()).orElse(null);
             if (p == null) {
@@ -54,9 +57,16 @@ public class OrderService {
             }
             CartView.Line line = new CartView.Line(p, e.getValue(), pricing.price(p, currency));
             lines.add(line);
-            total = total.add(line.getSubtotal());
+            subtotal = subtotal.add(line.getSubtotal());
+            weight += weightOf(p, e.getValue());
         }
-        return new CartView(lines, total, currency);
+        ShippingService.Quote quote = shipping.quote(currency, subtotal, weight);
+        return new CartView(lines, subtotal, quote.fee(), subtotal.add(quote.fee()), currency, quote.freeRemaining());
+    }
+
+    /** 没填重量的商品按 0 克计算。 */
+    private static int weightOf(Product p, int quantity) {
+        return p.getWeightGrams() == null ? 0 : p.getWeightGrams() * quantity;
     }
 
     /** 下单并扣减库存；任一商品不可购买时整单失败。金额按 currency 结算。 */
@@ -86,6 +96,7 @@ public class OrderService {
         }
         boolean english = currency == Currency.USD;
 
+        int weight = 0;
         for (Map.Entry<Long, Integer> e : cart.getItems().entrySet()) {
             Product p = products.findById(e.getKey())
                     .orElseThrow(() -> new BusinessException("error.cart.stale", "购物车中有商品已被删除，请刷新购物车"));
@@ -100,7 +111,9 @@ public class OrderService {
             }
             p.setStock(p.getStock() - qty);
             order.addItem(new OrderItem(p, title, pricing.price(p, currency), qty));
+            weight += weightOf(p, qty);
         }
+        order.addShippingFee(shipping.quote(currency, order.getTotal(), weight).fee());
         CustomerOrder saved = orders.save(order);
         // 事务提交成功后才清空购物车；提交失败（例如并发抢购导致版本冲突）时顾客的购物车保持不变
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
