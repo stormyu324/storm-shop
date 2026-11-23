@@ -93,4 +93,55 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!--
+          重新打包新版后台（admin-ui → src/main/resources/static/console）：
+            ./mvnw -Pui generate-resources
+          不需要自己安装 Node.js，插件会把 Node 下载到 admin-ui/node 里。
+          打包结果已经提交在仓库里，平时启动、打包不需要这一步；改了 admin-ui 的代码后才需要。
+        -->
+        <profile>
+            <id>ui</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.github.eirslett</groupId>
+                        <artifactId>frontend-maven-plugin</artifactId>
+                        <version>1.15.4</version>
+                        <configuration>
+                            <workingDirectory>admin-ui</workingDirectory>
+                            <installDirectory>admin-ui</installDirectory>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>install-node-and-npm</id>
+                                <goals><goal>install-node-and-npm</goal></goals>
+                                <phase>generate-resources</phase>
+                                <configuration>
+                                    <nodeVersion>v22.23.4</nodeVersion>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>npm-ci</id>
+                                <goals><goal>npm</goal></goals>
+                                <phase>generate-resources</phase>
+                                <configuration>
+                                    <arguments>ci --no-audit --no-fund</arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>npm-build</id>
+                                <goals><goal>npm</goal></goals>
+                                <phase>generate-resources</phase>
+                                <configuration>
+                                    <arguments>run build</arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
