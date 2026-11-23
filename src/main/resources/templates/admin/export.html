@@ -6,6 +6,7 @@
 <main class="container" style="max-width:960px">
     <h1>导出到亚马逊 / SHEIN</h1>
     <p class="muted">在本站维护一份商品资料，导出成表格后到平台卖家后台批量上传，不用在每个平台重复录入。</p>
+    <div th:replace="~{fragments/layout :: flash}"></div>
 
     <form class="filters" th:action="@{/admin/export}" method="get">
         <select name="status">
@@ -46,6 +47,15 @@
                 <div class="muted">美元价按汇率换算</div><div class="n" th:text="${readiness.autoUsdPrice}">0</div>
             </div>
         </div>
+        <form class="ai-bar" th:if="${readiness.missingTitleEn > 0}" th:action="@{/admin/export/ai-fill}" method="post"
+              onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='正在生成，请稍候（可能需要一两分钟）…';">
+            <input type="hidden" name="status" th:value="${status}">
+            <input type="hidden" name="category" th:value="${category}">
+            <button type="submit" th:disabled="${!aiEnabled}">✨ 用 AI 补全缺少的英文资料</button>
+            <span class="muted" th:text="${aiEnabled}
+                    ? '为缺英文标题的商品生成英文标题、5 条卖点和描述，只填空着的内容，不覆盖已有的；每次最多 20 个'
+                    : '需要先设置环境变量 ANTHROPIC_API_KEY 才能使用'"></span>
+        </form>
         <th:block th:unless="${readiness.incomplete.isEmpty()}">
             <p class="muted" style="margin-top:18px">以下商品缺少关键资料（最多显示 30 个），点击补充；也可以导出通用资料表，在 Excel 里批量补完后重新导入。</p>
             <div class="table-wrap">

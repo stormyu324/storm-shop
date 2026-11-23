@@ -174,6 +174,29 @@ public class ProductService {
         return products.save(copy);
     }
 
+    /** AI 批量补全用：只填写目前为空的英文标题 / 卖点 / 描述，不覆盖已有内容。返回是否有改动。 */
+    @Transactional
+    public boolean fillEnglishIfEmpty(Long id, ListingAiService.EnglishListing listing) {
+        Product p = products.findById(id).orElse(null);
+        if (p == null) {
+            return false;
+        }
+        boolean changed = false;
+        if (!StringUtils.hasText(p.getTitleEn()) && StringUtils.hasText(listing.title())) {
+            p.setTitleEn(listing.title());
+            changed = true;
+        }
+        if (!StringUtils.hasText(p.getBulletPointsEn()) && !listing.bulletPoints().isEmpty()) {
+            p.setBulletPointsEn(String.join("\n", listing.bulletPoints()));
+            changed = true;
+        }
+        if (!StringUtils.hasText(p.getDescriptionEn()) && StringUtils.hasText(listing.description())) {
+            p.setDescriptionEn(listing.description());
+            changed = true;
+        }
+        return changed;
+    }
+
     /** 事务提交后，删除已经没有任何商品使用的本地图片文件（回滚时不删）。 */
     private void deleteUnusedImagesAfterCommit(List<String> candidates) {
         List<String> local = candidates.stream().filter(u -> u.startsWith(ImageStorageService.URL_PREFIX)).toList();

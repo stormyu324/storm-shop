@@ -3,6 +3,7 @@ package com.javastorm.shop.web.admin;
 import com.javastorm.shop.domain.Product;
 import com.javastorm.shop.domain.ProductStatus;
 import com.javastorm.shop.repository.CategoryRepository;
+import com.javastorm.shop.service.ListingAiService;
 import com.javastorm.shop.service.ProductExportService;
 import com.javastorm.shop.service.ProductService;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,13 +32,15 @@ public class AdminExportController {
     private final ProductExportService exportService;
     private final CategoryRepository categories;
     private final String publicBaseUrl;
+    private final ListingAiService listingAi;
 
     public AdminExportController(ProductService productService, ProductExportService exportService,
-                                 CategoryRepository categories,
+                                 CategoryRepository categories, ListingAiService listingAi,
                                  @Value("${shop.public-base-url:}") String publicBaseUrl) {
         this.productService = productService;
         this.exportService = exportService;
         this.categories = categories;
+        this.listingAi = listingAi;
         this.publicBaseUrl = publicBaseUrl;
     }
 
@@ -54,6 +57,7 @@ public class AdminExportController {
         model.addAttribute("baseUrl", baseUrl);
         model.addAttribute("localBaseUrl", isLocal(baseUrl));
         model.addAttribute("baseUrlConfigured", StringUtils.hasText(publicBaseUrl));
+        model.addAttribute("aiEnabled", listingAi.isEnabled());
         return "admin/export";
     }
 

@@ -79,6 +79,10 @@
 
         <details class="card section" th:open="${form.titleEn != null or form.brand != null or form.barcode != null or form.priceUsd != null}">
             <summary><span style="width:4px;height:16px;border-radius:2px;background:var(--grad);display:inline-block"></span>跨境 / 平台资料 <span class="muted" style="font-weight:400;font-size:.85rem">英文前台、导出亚马逊 / SHEIN 时使用，可选填</span></summary>
+            <div class="ai-bar">
+                <button type="button" id="aiGenerate" class="ghost small" th:disabled="${!aiEnabled}">✨ AI 生成英文标题、卖点和描述</button>
+                <span id="aiStatus" class="muted" th:text="${aiEnabled} ? '根据上面填写的中文名称、描述、品牌、颜色、尺码、材质等生成，生成后可以再修改' : '需要先设置环境变量 ANTHROPIC_API_KEY 才能使用'"></span>
+            </div>
             <div class="grid-2">
                 <div class="field">
                     <label for="titleEn">英文标题</label>
@@ -166,6 +170,48 @@
     </form>
 </main>
 <script>
+    (function () {
+        var btn = document.getElementById('aiGenerate');
+        if (!btn) return;
+        var statusEl = document.getElementById('aiStatus');
+        var form = btn.form;
+        function val(name) {
+            var el = form.elements[name];
+            return el && el.value.trim() ? el.value.trim() : null;
+        }
+        btn.addEventListener('click', function () {
+            var targets = ['titleEn', 'bulletPointsEn', 'descriptionEn'];
+            var hasContent = targets.some(function (n) { return val(n); });
+            if (hasContent && !confirm('会覆盖已填写的英文标题、卖点和描述，确定吗？')) return;
+            var payload = {
+                name: val('name'), categoryId: val('categoryId'), description: val('description'),
+                brand: val('brand'), color: val('color'), size: val('size'), material: val('material'),
+                weightGrams: val('weightGrams'), lengthCm: val('lengthCm'), widthCm: val('widthCm'),
+                heightCm: val('heightCm'), titleEn: val('titleEn')
+            };
+            btn.disabled = true;
+            statusEl.textContent = '正在生成，通常需要 10～30 秒…';
+            fetch('/admin/products/ai/english', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': form.elements['_csrf'].value},
+                body: JSON.stringify(payload)
+            }).then(function (res) {
+                return res.json().catch(function () { return {error: '服务器返回异常（' + res.status + '）'}; });
+            }).then(function (data) {
+                if (data.error) {
+                    statusEl.textContent = data.error;
+                    return;
+                }
+                targets.forEach(function (n) { form.elements[n].value = data[n] || ''; });
+                statusEl.textContent = '已生成，请检查后再保存（AI 可能出错，尤其是尺寸、材质等事实信息）';
+            }).catch(function () {
+                statusEl.textContent = '网络错误，请重试';
+            }).finally(function () {
+                btn.disabled = false;
+            });
+        });
+    })();
+
     (function () {
         var input = document.getElementById('images');
         var zone = document.getElementById('dropzone');

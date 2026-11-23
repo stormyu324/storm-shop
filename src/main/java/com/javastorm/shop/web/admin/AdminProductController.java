@@ -4,6 +4,7 @@ import com.javastorm.shop.domain.Product;
 import com.javastorm.shop.domain.ProductStatus;
 import com.javastorm.shop.repository.CategoryRepository;
 import com.javastorm.shop.service.BusinessException;
+import com.javastorm.shop.service.ListingAiService;
 import com.javastorm.shop.service.ProductImportService;
 import com.javastorm.shop.service.ProductService;
 import com.javastorm.shop.web.form.ProductForm;
@@ -38,12 +39,14 @@ public class AdminProductController {
     private final ProductService productService;
     private final ProductImportService importService;
     private final CategoryRepository categories;
+    private final ListingAiService listingAi;
 
     public AdminProductController(ProductService productService, ProductImportService importService,
-                                  CategoryRepository categories) {
+                                  CategoryRepository categories, ListingAiService listingAi) {
         this.productService = productService;
         this.importService = importService;
         this.categories = categories;
+        this.listingAi = listingAi;
     }
 
     @GetMapping
@@ -184,6 +187,7 @@ public class AdminProductController {
         model.addAttribute("form", form);
         model.addAttribute("categories", categories.findAllByOrderBySortOrderAscIdAsc());
         model.addAttribute("statuses", ProductStatus.values());
+        model.addAttribute("aiEnabled", listingAi.isEnabled());
         return "admin/product-form";
     }
 

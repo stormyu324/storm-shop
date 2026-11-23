@@ -293,6 +293,10 @@ input[type=file]::file-selector-button {
 .variant-option.unavailable { color: var(--muted); text-decoration: line-through; border-style: dashed; }
 .variant-note { font-size: .8rem; margin-top: 2px; }
 
+/* AI 生成英文资料 */
+.ai-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 16px; }
+.ai-bar .muted { font-size: .85rem; }
+
 /* ===== 商品详情 ===== */
 .crumbs { font-size: .88rem; color: var(--muted); margin-bottom: 16px; }
 .crumbs a { color: var(--muted); }
