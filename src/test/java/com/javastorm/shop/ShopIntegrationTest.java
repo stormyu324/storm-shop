@@ -1,5 +1,7 @@
 package com.javastorm.shop;
 
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import org.springframework.http.MediaType;
 import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.OrderStatus;
@@ -61,23 +63,24 @@ class ShopIntegrationTest {
     }
 
     @Test
-    void adminPagesRequireLogin() throws Exception {
-        mvc.perform(get("/admin/products")).andExpect(redirectedUrlPattern("**/admin/login"));
+    void adminDataRequiresLogin() throws Exception {
+        // 后台页面本身是公开的 Vue 应用，数据接口需要登录
+        mvc.perform(get("/admin/products")).andExpect(status().isOk());
+        mvc.perform(get("/api/admin/products")).andExpect(status().isUnauthorized());
         mvc.perform(get("/")).andExpect(status().isOk());
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void createProductWithUploadedImageAndPublish() throws Exception {
-        MockMultipartFile image = new MockMultipartFile("images", "shirt.png", "image/png", new byte[]{1, 2, 3});
-        mvc.perform(multipart("/admin/products/save").file(image)
-                        .param("name", "测试T恤")
-                        .param("price", "59.90")
-                        .param("stock", "10")
-                        .param("status", "ON_SALE")
-                        .param("imageUrlsText", "https://example.com/front.jpg")
-                        .with(csrf()))
-                .andExpect(redirectedUrl("/admin/products"));
+        MockMultipartFile image = new MockMultipartFile("files", "shirt.png", "image/png", new byte[]{1, 2, 3});
+        String uploaded = mvc.perform(multipart("/api/admin/images").file(image).with(csrf()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String url = uploaded.replaceAll(".*\\[\"([^\"]+)\"].*", "$1");
+        mvc.perform(post("/api/admin/products").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"测试T恤\",\"price\":59.90,\"stock\":10,\"status\":\"ON_SALE\","
+                                + "\"imageUrls\":[\"https://example.com/front.jpg\",\"" + url + "\"]}"))
+                .andExpect(status().isCreated());
 
         Product p = products.findAll().get(0);
         assertThat(p.getSku()).startsWith("P");
@@ -93,12 +96,10 @@ class ShopIntegrationTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void rejectsNonImageUpload() throws Exception {
-        MockMultipartFile bad = new MockMultipartFile("images", "evil.html", "text/html", "<script>".getBytes());
-        mvc.perform(multipart("/admin/products/save").file(bad)
-                        .param("name", "x").param("price", "1").param("stock", "1").param("status", "DRAFT")
-                        .with(csrf()))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("不支持的图片格式")));
+        MockMultipartFile bad = new MockMultipartFile("files", "evil.html", "text/html", "<script>".getBytes());
+        mvc.perform(multipart("/api/admin/images").file(bad).with(csrf()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(containsString("不支持的图片格式")));
         assertThat(products.count()).isZero();
     }
 
@@ -106,8 +107,9 @@ class ShopIntegrationTest {
     @WithMockUser(roles = "ADMIN")
     void batchUnpublishHidesFromStorefront() throws Exception {
         Product p = product("SKU-1", 5, ProductStatus.ON_SALE);
-        mvc.perform(post("/admin/products/batch").param("ids", p.getId().toString()).param("op", "OFF_SHELF").with(csrf()))
-                .andExpect(redirectedUrl("/admin/products"));
+        mvc.perform(post("/api/admin/products/batch").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[" + p.getId() + "],\"action\":\"OFF_SHELF\"}"))
+                .andExpect(jsonPath("$.affected").value(1));
         assertThat(products.findById(p.getId()).orElseThrow().getStatus()).isEqualTo(ProductStatus.OFF_SHELF);
         mvc.perform(get("/")).andExpect(content().string(not(containsString("商品SKU-1"))));
         mvc.perform(get("/products/" + p.getId())).andExpect(status().isNotFound());

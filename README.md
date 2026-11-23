@@ -23,8 +23,7 @@ git clone https://github.com/stormyu324/storm-shop.git
 启动脚本会检查 Java 版本、启动商城，并在启动完成后自动打开浏览器。第一次运行要下载依赖，需要几分钟。
 
 - 商城首页：http://localhost:8080
-- 管理后台（新版）：http://localhost:8080/console （默认账号 `admin` / `admin123`）
-- 管理后台（旧版）：http://localhost:8080/admin ，两个后台功能一样、登录互通，旧版过渡期后会下线
+- 管理后台：http://localhost:8080/admin （默认账号 `admin` / `admin123`）
 
 停止：关掉命令行窗口，或按 `Ctrl + C`。首次启动会自动写入几条示例商品（`DEMO_DATA=false` 可关闭）。
 
@@ -147,17 +146,17 @@ AI 只能推荐店里真实存在、正在销售的商品；同样的问题 10 �
 
 默认只有美元订单走 Stripe；如果你的 Stripe 账户支持人民币收款，可以设置 `STRIPE_CURRENCIES=USD,CNY`。
 
-## 新版后台（Vue）
+## 管理后台（Vue）
 
-新版后台地址 **/console**，用 Vue 3 + Element Plus 编写，通过下面的 REST 接口读写数据。功能与旧版 `/admin` 相同：概览、商品（多图拖拽上传和排序、跨境资料、AI 生成英文资料、复制、批量上下架）、批量导入、平台导出、订单、分类、运费。
+管理后台地址 **/admin**，用 Vue 3 + Element Plus 编写，通过下面的 REST 接口读写数据：概览、商品（多图拖拽上传和排序、跨境资料、AI 生成英文资料、复制、批量上下架）、批量导入、平台导出、订单、分类、运费。
 
-前端源码在 `admin-ui/`，打包好的文件已经放在 `src/main/resources/static/console/` 并提交在仓库里，所以**平时启动和部署不需要 Node.js**。只有修改了 `admin-ui` 的代码，才需要重新打包：
+前端源码在 `admin-ui/`，打包好的文件已经放在 `src/main/resources/static/admin/` 并提交在仓库里，所以**平时启动和部署不需要 Node.js**。只有修改了 `admin-ui` 的代码，才需要重新打包：
 
 ```bash
 ./mvnw -Pui generate-resources
 ```
 
-（Maven 会自动下载 Node 到 `admin-ui/node`，不用自己安装。）开发前端时也可以用热更新：先启动后端，再在 `admin-ui` 里运行 `npm install` 和 `npm run dev`，打开 http://localhost:5173/console/ ，接口会自动转发到 8080 端口。
+（Maven 会自动下载 Node 到 `admin-ui/node`，不用自己安装。）开发前端时也可以用热更新：先启动后端，再在 `admin-ui` 里运行 `npm install` 和 `npm run dev`，打开 http://localhost:5173/admin/ ，接口会自动转发到 8080 端口。
 
 ## 接口（REST API）
 
@@ -165,7 +164,7 @@ AI 只能推荐店里真实存在、正在销售的商品；同样的问题 10 �
 
 - **公开接口** `/api/...`：商品列表 / 详情（含颜色尺码规格）、分类、国家列表、运费试算、下单（开通 Stripe 时返回付款链接）。语言用 `lang=zh|en`，币种用 `currency=CNY|USD`。
 - **后台接口** `/api/admin/...`：商品增删改查、图片上传、CSV 导入、批量上下架、订单、分类、运费、数据概览、AI 生成英文资料。
-  登录方式：`GET /api/admin/session` 获取 CSRF 令牌（Cookie `XSRF-TOKEN`）→ `POST /api/admin/session` 登录 → 之后修改类请求在请求头 `X-XSRF-TOKEN` 带上令牌。在接口文档页调试时，先在另一个标签页登录 `/admin` 即可。
+  登录方式：`GET /api/admin/session` 获取 CSRF 令牌（Cookie `XSRF-TOKEN`）→ `POST /api/admin/session` 登录 → 之后修改类请求在请求头 `X-XSRF-TOKEN` 带上令牌。在接口文档页调试时，先在另一个标签页登录 `/admin` 后台即可。
 - 出错统一返回 `{"message": "...", "fields": {...}}`，状态码：400 格式或字段错误、401 未登录、403 无权限或缺 CSRF 令牌、404 不存在、409 数据刚被修改、422 业务规则不允许（如库存不足）。
 
 正式环境模式（`SPRING_PROFILES_ACTIVE=prod`）默认不公开接口文档，需要时设置 `API_DOCS=true`。

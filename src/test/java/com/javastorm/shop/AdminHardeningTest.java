@@ -1,5 +1,7 @@
 package com.javastorm.shop;
 
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import org.springframework.http.MediaType;
 import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.OrderStatus;
@@ -85,20 +87,25 @@ class AdminHardeningTest {
     @WithMockUser(roles = "ADMIN")
     void invalidAdminParametersDoNotCauseServerErrors() throws Exception {
         Product p = product("BAD-1", 1);
-        mvc.perform(post("/admin/products/batch").with(csrf()).param("ids", p.getId().toString()).param("op", "HACK"))
-                .andExpect(redirectedUrl("/admin/products"))
-                .andExpect(flash().attribute("error", "不支持的操作：HACK"));
-        mvc.perform(get("/admin/export").param("status", "HACK")).andExpect(status().isOk());
-        mvc.perform(get("/admin/export/amazon.csv").param("status", "HACK")).andExpect(status().isOk());
+        mvc.perform(post("/api/admin/products/batch").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[" + p.getId() + "],\"action\":\"HACK\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fields.action").exists());
+        mvc.perform(get("/api/admin/export/readiness").param("status", "HACK")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/admin/export/amazon.csv").param("status", "HACK")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/admin/orders").param("page", "-5")).andExpect(status().isOk());
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void deletingProductRemovesImageFilesNoLongerUsed() throws Exception {
-        MockMultipartFile image = new MockMultipartFile("images", "a.png", "image/png", new byte[]{1, 2, 3});
-        mvc.perform(multipart("/admin/products/save").file(image).with(csrf())
-                        .param("name", "带图商品").param("price", "10").param("stock", "1").param("status", "ON_SALE"))
-                .andExpect(redirectedUrl("/admin/products"));
+        MockMultipartFile image = new MockMultipartFile("files", "a.png", "image/png", new byte[]{1, 2, 3});
+        String uploaded = mvc.perform(multipart("/api/admin/images").file(image).with(csrf()))
+                .andReturn().getResponse().getContentAsString();
+        String imageUrl = uploaded.replaceAll(".*\\[\"([^\"]+)\"].*", "$1");
+        mvc.perform(post("/api/admin/products").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"带图商品\",\"price\":10,\"stock\":1,\"imageUrls\":[\"" + imageUrl + "\"]}"))
+                .andExpect(status().isCreated());
         Product original = products.findAll().get(0);
         String url = original.getMainImage();
         Path file = images.getRoot().resolve(url.substring(ImageStorageService.URL_PREFIX.length()));

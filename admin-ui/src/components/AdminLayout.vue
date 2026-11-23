@@ -20,7 +20,6 @@
         <el-button text @click="collapsed = !collapsed" :icon="collapsed ? 'Expand' : 'Fold'" />
         <div class="spacer" />
         <a href="/" target="_blank" class="header-link"><el-icon><Shop /></el-icon> 查看商城</a>
-        <a href="/admin" class="header-link">旧版后台</a>
         <el-dropdown @command="onCommand">
           <span class="user"><el-icon><User /></el-icon> {{ auth.username }} <el-icon><ArrowDown /></el-icon></span>
           <template #dropdown>

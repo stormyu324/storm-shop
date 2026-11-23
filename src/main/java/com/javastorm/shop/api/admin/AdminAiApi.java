@@ -6,7 +6,7 @@ import com.javastorm.shop.repository.CategoryRepository;
 import com.javastorm.shop.service.EnglishFillService;
 import com.javastorm.shop.service.ListingAiService;
 import com.javastorm.shop.service.ListingAiService.ListingInput;
-import com.javastorm.shop.web.admin.AdminAiController.DraftRequest;
+import com.javastorm.shop.api.AdminDtos.DraftRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;

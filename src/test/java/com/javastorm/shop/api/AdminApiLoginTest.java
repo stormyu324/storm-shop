@@ -69,8 +69,8 @@ class AdminApiLoginTest {
         mvc.perform(post("/api/admin/categories").session(loggedIn).cookie(xsrf).header("X-XSRF-TOKEN", token)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"数码\",\"sortOrder\":1}"))
                 .andExpect(status().isCreated());
-        // 登录后也能直接打开网页后台（同一个会话）
-        mvc.perform(get("/admin").session(loggedIn)).andExpect(status().isOk());
+        // 后台页面（Vue）和接口用同一个会话
+        mvc.perform(get("/admin/products").session(loggedIn)).andExpect(status().isOk());
 
         mvc.perform(delete("/api/admin/session").session(loggedIn).cookie(xsrf).header("X-XSRF-TOKEN", token))
                 .andExpect(status().isNoContent());

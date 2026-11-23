@@ -1,5 +1,8 @@
 package com.javastorm.shop;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import org.springframework.http.MediaType;
 import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.Product;
 import com.javastorm.shop.domain.ProductStatus;
@@ -101,26 +104,22 @@ class DataSafetyTest {
         orderService.placeOrder(cart, checkout(), Currency.CNY);
         assertThat(products.findById(p.getId()).orElseThrow().getStock()).isEqualTo(8);
 
-        // 管理员用旧页面保存（库存仍是打开时的 10）
-        mvc.perform(multipart("/admin/products/save").with(csrf())
-                        .param("id", p.getId().toString())
-                        .param("version", String.valueOf(versionWhenOpened))
-                        .param("name", "改了名字").param("sku", "EDIT-1")
-                        .param("price", "10").param("stock", "10").param("status", "ON_SALE"))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("编辑期间被修改过")));
+        // 管理员用打开时的数据保存（库存仍是打开时的 10）
+        mvc.perform(put("/api/admin/products/{id}", p.getId()).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"改了名字\",\"sku\":\"EDIT-1\",\"price\":10,\"stock\":10,"
+                                + "\"status\":\"ON_SALE\",\"version\":" + versionWhenOpened + "}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(containsString("编辑期间被修改过")));
 
         Product after = products.findById(p.getId()).orElseThrow();
         assertThat(after.getStock()).isEqualTo(8);
         assertThat(after.getName()).isEqualTo("商品EDIT-1");
 
         // 重新打开（拿到新版本号）后可以正常保存
-        mvc.perform(multipart("/admin/products/save").with(csrf())
-                        .param("id", p.getId().toString())
-                        .param("version", String.valueOf(after.getVersion()))
-                        .param("name", "改了名字").param("sku", "EDIT-1")
-                        .param("price", "10").param("stock", "8").param("status", "ON_SALE"))
-                .andExpect(redirectedUrl("/admin/products"));
+        mvc.perform(put("/api/admin/products/{id}", p.getId()).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"改了名字\",\"sku\":\"EDIT-1\",\"price\":10,\"stock\":8,"
+                                + "\"status\":\"ON_SALE\",\"version\":" + after.getVersion() + "}"))
+                .andExpect(status().isOk());
         assertThat(products.findById(p.getId()).orElseThrow().getName()).isEqualTo("改了名字");
     }
 

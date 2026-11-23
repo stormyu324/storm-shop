@@ -16,7 +16,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
-/** 前台所有人可访问；/admin/** 需要管理员登录。 */
+/** 前台和后台页面所有人可访问；后台数据接口 /api/admin/** 需要管理员登录（登录接口见 AdminSessionApi）。 */
 @Configuration
 public class SecurityConfig {
 
@@ -56,20 +56,11 @@ public class SecurityConfig {
     @Bean
     @Order(2)
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        // 网页部分：商城前台全部公开；/admin 是后台的 Vue 页面（本身公开，数据都走需要登录的 /api/admin 接口）
         http
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/admin/login").permitAll()
-                        .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .anyRequest().permitAll())
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
                 // Stripe 服务器的通知没有 CSRF token，靠签名校验
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/stripe/webhook"))
-                .formLogin(form -> form
-                        .loginPage("/admin/login")
-                        .defaultSuccessUrl("/admin", true)
-                        .permitAll())
-                .logout(logout -> logout
-                        .logoutUrl("/admin/logout")
-                        .logoutSuccessUrl("/"));
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/stripe/webhook"));
         return http.build();
     }
 

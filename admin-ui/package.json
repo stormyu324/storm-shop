@@ -2,7 +2,7 @@
   "name": "storm-shop-admin",
   "private": true,
   "version": "1.0.0",
-  "description": "Storm 商城新版后台（Vue 3 + Element Plus），打包输出到 ../src/main/resources/static/console",
+  "description": "Storm 商城管理后台（Vue 3 + Element Plus），打包输出到 ../src/main/resources/static/admin",
   "type": "module",
   "scripts": {
     "dev": "vite",

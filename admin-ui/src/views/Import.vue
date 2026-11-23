@@ -5,7 +5,7 @@
       <h3 class="section-title">1. 下载模板，用 Excel / WPS 填写</h3>
       <p class="muted">只有<b>名称</b>和<b>售价</b>必填；<b>SKU 相同则更新、不同则新建</b>，所以同一张表可以反复导入来改价、补库存。
         分类不存在会自动创建；多张图片网址用 <code>|</code> 分隔；UTF-8 和 GBK 编码都能识别。</p>
-      <a href="/admin/products/import/template.csv"><el-button><el-icon><Download /></el-icon>&nbsp;下载 CSV 模板</el-button></a>
+      <a href="/api/admin/products/import/template.csv"><el-button><el-icon><Download /></el-icon>&nbsp;下载 CSV 模板</el-button></a>
       <details class="cols">
         <summary class="muted">查看全部列</summary>
         <p class="mono small">名称, SKU, 分类, 售价, 原价, 库存, 状态, 图片, 描述, 英文标题, 美元售价, 品牌, 款号, 颜色, 尺码, 材质, 重量(g), 长(cm), 宽(cm), 高(cm), 条码, 英文卖点, 英文描述</p>

@@ -1,5 +1,7 @@
 package com.javastorm.shop;
 
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import org.springframework.http.MediaType;
 import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.OrderStatus;
@@ -232,8 +234,10 @@ class PaymentFlowTest {
         CustomerOrder order = pendingOrder(1);
         when(stripe.retrieve("cs_x")).thenReturn(new SessionState("cs_x", order.getOrderNo(), true, false));
 
-        mvc.perform(post("/admin/orders/{id}/status", order.getId()).with(csrf()).param("status", "CANCELLED"))
-                .andExpect(flash().attribute("error", containsString("已经付款成功")));
+        mvc.perform(post("/api/admin/orders/{id}/status", order.getId()).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"CANCELLED\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(containsString("已经付款成功")));
 
         assertThat(onlyOrder().getStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(stock()).isEqualTo(4);

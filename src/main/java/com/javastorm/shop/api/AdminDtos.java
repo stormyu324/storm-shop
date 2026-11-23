@@ -133,6 +133,12 @@ public final class AdminDtos {
     public record ShippingSettings(Currency currency, DefaultRule defaultRule, List<Zone> zones) {
     }
 
+    /** 编辑页上还没保存的表单内容，用来生成英文资料。 */
+    public record DraftRequest(String name, Long categoryId, String description, String brand, String color,
+                               String size, String material, Integer weightGrams, String lengthCm, String widthCm,
+                               String heightCm, String titleEn) {
+    }
+
     public record EnglishDraft(String titleEn, List<String> bulletPointsEn, String descriptionEn) {
     }
 }

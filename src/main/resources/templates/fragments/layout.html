@@ -26,25 +26,6 @@
     </div>
 </header>
 
-<header th:fragment="adminHeader(active)" class="topbar admin">
-    <div class="container topbar-inner">
-        <a class="brand" th:href="@{/admin}"><span class="logo-mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2 4 13.5h6.5L9 22l10-12h-6.6L13.5 2z"/></svg></span><span>Storm<span class="accent">商城</span></span><span class="console">ADMIN</span></a>
-        <nav class="topnav">
-            <a th:href="@{/admin}" th:classappend="${active == 'dashboard'} ? 'active'">概览</a>
-            <a th:href="@{/admin/products}" th:classappend="${active == 'products'} ? 'active'">商品</a>
-            <a th:href="@{/admin/products/import}" th:classappend="${active == 'import'} ? 'active'">批量导入</a>
-            <a th:href="@{/admin/export}" th:classappend="${active == 'export'} ? 'active'">平台导出</a>
-            <a th:href="@{/admin/categories}" th:classappend="${active == 'categories'} ? 'active'">分类</a>
-            <a th:href="@{/admin/orders}" th:classappend="${active == 'orders'} ? 'active'">订单</a>
-            <a th:href="@{/admin/shipping}" th:classappend="${active == 'shipping'} ? 'active'">运费</a>
-            <a th:href="@{/console/}" class="new-console">✨ 新版后台</a>
-            <a th:href="@{/}" target="_blank">查看商城 ↗</a>
-            <form th:action="@{/admin/logout}" method="post" class="inline">
-                <button type="submit" class="link">退出</button>
-            </form>
-        </nav>
-    </div>
-</header>
 
 <div th:fragment="flash">
     <div class="alert success" th:if="${message}" th:text="${message}"></div>

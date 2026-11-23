@@ -149,6 +149,12 @@ public class AdminProductApi {
         return importService.importCsv(file.getBytes(), defaultStatus);
     }
 
+    @GetMapping("/products/import/template.csv")
+    @Operation(summary = "下载 CSV 导入模板", description = "带 BOM 的 UTF-8，Excel 打开不会乱码")
+    public ResponseEntity<byte[]> importTemplate() {
+        return Csv.download("商品导入模板.csv", importService.template());
+    }
+
     private Product find(Long id) {
         return products.findById(id).orElseThrow(() -> new NotFoundException("商品不存在"));
     }

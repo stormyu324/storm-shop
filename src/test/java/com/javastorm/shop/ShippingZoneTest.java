@@ -1,5 +1,8 @@
 package com.javastorm.shop;
 
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import org.springframework.http.MediaType;
 import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.Product;
@@ -180,24 +183,25 @@ class ShippingZoneTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void adminManagesZonesAndRejectsOverlapsAndBadCodes() throws Exception {
-        mvc.perform(post("/admin/shipping/USD/zones").with(csrf()).param("name", "北美")
-                        .param("countries", "ca, us").param("baseFee", "6"))
-                .andExpect(flash().attribute("error", containsString("US 已经在分组「美国」里了")));
-        mvc.perform(post("/admin/shipping/USD/zones").with(csrf()).param("name", "坏代码")
-                        .param("countries", "XX").param("baseFee", "6"))
-                .andExpect(flash().attribute("error", containsString("国家代码有误")));
+        mvc.perform(post("/api/admin/shipping/USD/zones").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"北美\",\"countries\":[\"ca\",\"us\"],\"baseFee\":6}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(containsString("US 已经在分组「美国」里了")));
+        mvc.perform(post("/api/admin/shipping/USD/zones").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"坏代码\",\"countries\":[\"XX\"],\"baseFee\":6}"))
+                .andExpect(jsonPath("$.message").value(containsString("国家代码有误")));
 
-        mvc.perform(post("/admin/shipping/USD/zones").with(csrf()).param("name", "加拿大 澳洲")
-                        .param("countries", "ca，AU").param("baseFee", "8.5").param("includedGrams", "500"))
-                .andExpect(redirectedUrl("/admin/shipping"));
+        mvc.perform(post("/api/admin/shipping/USD/zones").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"加拿大 澳洲\",\"countries\":[\"ca\",\"AU\"],\"baseFee\":8.5,\"includedGrams\":500}"))
+                .andExpect(status().isCreated());
         ShippingZone added = zones.findByCurrencyOrderByIdAsc(Currency.USD).get(2);
         assertThat(added.getCountryList()).containsExactly("CA", "AU");
         assertThat(added.getIncludedGrams()).isEqualTo(500);
 
-        mvc.perform(get("/admin/shipping")).andExpect(content().string(containsString("加拿大、澳大利亚")));
+        mvc.perform(get("/api/admin/shipping")).andExpect(jsonPath("$[1].zones[2].countries[1]").value("AU"));
 
-        mvc.perform(post("/admin/shipping/zones/{id}/delete", added.getId()).with(csrf()))
-                .andExpect(redirectedUrl("/admin/shipping"));
+        mvc.perform(delete("/api/admin/shipping/zones/{id}", added.getId()).with(csrf()))
+                .andExpect(status().isNoContent());
         assertThat(zones.findByCurrencyOrderByIdAsc(Currency.USD)).hasSize(2);
     }
 

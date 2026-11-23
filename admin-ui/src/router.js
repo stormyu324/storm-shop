@@ -3,7 +3,7 @@ import { auth, loadSession } from './auth'
 import AdminLayout from './components/AdminLayout.vue'
 
 const router = createRouter({
-  history: createWebHistory('/console/'),
+  history: createWebHistory('/admin/'),
   routes: [
     { path: '/login', name: 'login', component: () => import('./views/Login.vue'), meta: { public: true, title: '登录' } },
     {
@@ -18,7 +18,10 @@ const router = createRouter({
         { path: 'export', name: 'export', component: () => import('./views/Export.vue'), meta: { title: '平台导出' } },
         { path: 'orders', name: 'orders', component: () => import('./views/Orders.vue'), meta: { title: '订单' } },
         { path: 'categories', name: 'categories', component: () => import('./views/Categories.vue'), meta: { title: '分类' } },
-        { path: 'shipping', name: 'shipping', component: () => import('./views/Shipping.vue'), meta: { title: '运费' } }
+        { path: 'shipping', name: 'shipping', component: () => import('./views/Shipping.vue'), meta: { title: '运费' } },
+        // 旧版后台的地址，收藏夹里的链接继续可用
+        { path: 'products/:id/edit', redirect: to => `/products/${to.params.id}` },
+        { path: 'products/import', redirect: '/import' }
       ]
     },
     { path: '/:pathMatch(.*)*', redirect: '/' }

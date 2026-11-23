@@ -58,17 +58,17 @@ class AiListingTest {
         when(ai.generate(argThat(in -> in != null && "保温杯".equals(in.name()) && "Steel".equals(in.material()))))
                 .thenReturn(new EnglishListing("Insulated Bottle", List.of("KEEPS HOT: 12 hours", "LEAKPROOF: lid"), "Desc"));
 
-        mvc.perform(post("/admin/products/ai/english").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/admin/ai/english-draft").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"保温杯\",\"material\":\"Steel\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.titleEn").value("Insulated Bottle"))
-                .andExpect(jsonPath("$.bulletPointsEn").value("KEEPS HOT: 12 hours\nLEAKPROOF: lid"));
+                .andExpect(jsonPath("$.bulletPointsEn[1]").value("LEAKPROOF: lid"));
 
         doThrow(new BusinessException("AI 服务暂时不可用")).when(ai).generate(any());
-        mvc.perform(post("/admin/products/ai/english").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/admin/ai/english-draft").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"保温杯\"}"))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.error").value("AI 服务暂时不可用"));
+                .andExpect(jsonPath("$.message").value("AI 服务暂时不可用"));
     }
 
     @Test
@@ -78,9 +78,10 @@ class AiListingTest {
         Product done = product("A-3", "Already Done", null);
         when(ai.generate(any())).thenReturn(new EnglishListing("Generated Title", List.of("NEW: bullet"), "Generated desc"));
 
-        mvc.perform(post("/admin/export/ai-fill").with(csrf()).param("status", "ON_SALE"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(flash().attribute("message", org.hamcrest.Matchers.containsString("已为 2 个商品")));
+        mvc.perform(post("/api/admin/ai/english-fill").with(csrf()).param("status", "ON_SALE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.filled").value(2))
+                .andExpect(jsonPath("$.remaining").value(0));
 
         Product a = products.findById(empty.getId()).orElseThrow();
         assertThat(a.getTitleEn()).isEqualTo("Generated Title");
@@ -100,8 +101,9 @@ class AiListingTest {
     void batchFillReportsFailures() throws Exception {
         product("F-1", null, null);
         when(ai.generate(any())).thenThrow(new BusinessException("AI 调用太频繁，请稍等一分钟再试"));
-        mvc.perform(post("/admin/export/ai-fill").with(csrf()).param("status", "ON_SALE"))
-                .andExpect(flash().attribute("error", org.hamcrest.Matchers.containsString("AI 调用太频繁")));
+        mvc.perform(post("/api/admin/ai/english-fill").with(csrf()).param("status", "ON_SALE"))
+                .andExpect(jsonPath("$.filled").value(0))
+                .andExpect(jsonPath("$.failures[0]").value(org.hamcrest.Matchers.containsString("AI 调用太频繁")));
     }
 
     private Product product(String sku, String titleEn, String bullets) {

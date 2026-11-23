@@ -40,11 +40,11 @@
       <h3 class="section-title">下载表格</h3>
       <div class="export-option">
         <div><b>亚马逊格式</b><p class="muted">列名按亚马逊库存文件（flat file）的字段名，价格为美元；填了“款号”的商品会自动生成父商品行和变体关系。</p></div>
-        <a :href="`/admin/export/amazon.csv${qs}`"><el-button type="primary">下载亚马逊表格</el-button></a>
+        <a :href="`/api/admin/export/amazon.csv${qs}`"><el-button type="primary">下载亚马逊表格</el-button></a>
       </div>
       <div class="export-option">
         <div><b>通用资料表（SHEIN 等平台）</b><p class="muted">包含全部中英文资料和完整图片链接；列和“批量导入”一致，改完可以直接导回本站。</p></div>
-        <a :href="`/admin/export/products.csv${qs}`"><el-button>下载通用资料表</el-button></a>
+        <a :href="`/api/admin/export/products.csv${qs}`"><el-button>下载通用资料表</el-button></a>
       </div>
     </el-card>
   </div>
@@ -63,8 +63,7 @@ const r = ref(null)
 const loading = ref(false)
 const filling = ref(false)
 
-// 下载接口里 status 缺省表示“上架”，所以“全部状态”要显式传空值
-const qs = computed(() => `?status=${encodeURIComponent(status.value || '')}` + (category.value ? `&category=${category.value}` : ''))
+const qs = computed(() => api.query({ status: status.value, category: category.value }))
 
 const items = computed(() => r.value ? [
   { label: '缺英文标题', value: r.value.missingTitleEn, warn: r.value.missingTitleEn > 0 },

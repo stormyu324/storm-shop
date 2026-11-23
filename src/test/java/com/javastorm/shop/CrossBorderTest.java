@@ -1,5 +1,7 @@
 package com.javastorm.shop;
 
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import org.springframework.http.MediaType;
 import com.javastorm.shop.domain.Category;
 import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
@@ -202,15 +204,19 @@ class CrossBorderTest {
     @WithMockUser(roles = "ADMIN")
     void exportPageAndDownloadsWork() throws Exception {
         product("X-1", "无英文商品", "10.00", null);
-        mvc.perform(get("/admin/export"))
+        mvc.perform(get("/api/admin/export/readiness").param("status", "ON_SALE"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("资料完整度")))
-                .andExpect(content().string(containsString("无英文商品")));
-        mvc.perform(get("/admin/export/amazon.csv"))
+                .andExpect(jsonPath("$.missingTitleEn").value(1))
+                .andExpect(jsonPath("$.incomplete[0].name").value("无英文商品"))
+                .andExpect(jsonPath("$.imageBaseUrl").value("https://shop.example.com"));
+        mvc.perform(get("/api/admin/products/import/template.csv"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("名称,SKU,分类")));
+        mvc.perform(get("/api/admin/export/amazon.csv").param("status", "ON_SALE"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Disposition", containsString("attachment")))
                 .andExpect(content().string(containsString("item_sku")));
-        mvc.perform(get("/admin/export/products.csv").param("status", ""))
+        mvc.perform(get("/api/admin/export/products.csv"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("X-1")));
     }

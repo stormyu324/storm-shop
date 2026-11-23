@@ -5,7 +5,7 @@
         <span class="logo"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M13.5 2 4 13.5h6.5L9 22l10-12h-6.6L13.5 2z"/></svg></span>
         <div>
           <h1>Storm 商城后台</h1>
-          <p class="muted">新版管理后台</p>
+          <p class="muted">管理后台</p>
         </div>
       </div>
       <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" class="mb" />
@@ -18,7 +18,7 @@
         </el-form-item>
         <el-button type="primary" size="large" :loading="loading" class="full" @click="submit">登录</el-button>
       </el-form>
-      <p class="muted foot"><a href="/admin">使用旧版后台</a> · <a href="/">返回商城</a></p>
+      <p class="muted foot"><a href="/">返回商城</a></p>
     </el-card>
   </div>
 </template>

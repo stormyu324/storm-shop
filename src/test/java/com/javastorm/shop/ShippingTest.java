@@ -1,5 +1,9 @@
 package com.javastorm.shop;
 
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import org.springframework.http.MediaType;
 import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.Product;
@@ -141,9 +145,9 @@ class ShippingTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void adminSavesRule() throws Exception {
-        mvc.perform(post("/admin/shipping/USD").with(csrf()).param("enabled", "true").param("baseFee", "4.5")
-                        .param("includedGrams", "500").param("extraPerKg", "").param("freeThreshold", "39"))
-                .andExpect(redirectedUrl("/admin/shipping"));
+        mvc.perform(put("/api/admin/shipping/USD/default").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true,\"baseFee\":4.5,\"includedGrams\":500,\"extraPerKg\":null,\"freeThreshold\":39}"))
+                .andExpect(status().isOk());
         ShippingRule r = rules.findByCurrency(Currency.USD).orElseThrow();
         assertThat(r.isEnabled()).isTrue();
         assertThat(r.getBaseFee()).isEqualByComparingTo("4.5");
@@ -151,7 +155,7 @@ class ShippingTest {
         assertThat(r.getExtraPerKg()).isNull();
         assertThat(r.getFreeThreshold()).isEqualByComparingTo("39");
 
-        mvc.perform(get("/admin/shipping")).andExpect(content().string(containsString("美元（英文前台）")));
+        mvc.perform(get("/api/admin/shipping")).andExpect(jsonPath("$[1].defaultRule.baseFee").value(4.5));
     }
 
     private static CheckoutForm checkout() {
