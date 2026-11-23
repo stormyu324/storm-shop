@@ -29,6 +29,11 @@
         </table>
     </div>
     <form class="card" th:action="@{/checkout}" th:object="${form}" method="post">
+        <div class="field">
+            <label for="email" th:text="${en} ? 'Email for order updates and secure lookup' : '邮箱（接收通知与查询验证码）'"></label>
+            <input id="email" type="email" th:field="*{email}" maxlength="254" autocomplete="email">
+            <div class="err" th:errors="*{email}"></div>
+        </div>
         <h2 th:text="#{checkout.shipping}">收货信息</h2>
         <div class="grid-2">
             <div class="field">

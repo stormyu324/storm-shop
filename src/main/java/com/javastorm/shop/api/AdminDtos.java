@@ -101,7 +101,8 @@ public final class AdminDtos {
             @Schema(description = "后台可以改成的状态") List<OrderStatus> nextStatuses,
             Currency currency, BigDecimal itemsTotal, BigDecimal shippingFee, BigDecimal total,
             String customerName, String phone, String country, String address, String note,
-            List<OrderLine> items, LocalDateTime createdAt, LocalDateTime paidAt) {
+            List<OrderLine> items, LocalDateTime createdAt, LocalDateTime paidAt,
+            String email,String carrier,String trackingNumber,String trackingUrl,LocalDateTime shippedAt) {
     }
 
     public record StatusChange(@NotNull OrderStatus status) {

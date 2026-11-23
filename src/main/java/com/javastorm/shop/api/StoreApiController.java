@@ -176,6 +176,7 @@ public class StoreApiController {
         form.setPhone(req.phone());
         form.setAddress(req.address());
         form.setNote(req.note());
+        form.setEmail(req.email());
         form.setCountry(req.country());
         Map<String, String> errors = new LinkedHashMap<>();
         for (ConstraintViolation<CheckoutForm> v : validator.validate(form)) {

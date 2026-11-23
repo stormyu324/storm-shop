@@ -85,6 +85,31 @@ public class StripePaymentService {
     public record WebhookEvent(String type, SessionState session) {
     }
 
+    public record RefundState(String id, String status) {}
+    public RefundState refund(CustomerOrder order, String requestId, String refundId) {
+        requireEnabled();
+        try {
+            com.stripe.model.Refund refund;
+            if (refundId != null) {
+                refund = client.v1().refunds().retrieve(refundId);
+            } else {
+                Session session = client.v1().checkout().sessions().retrieve(order.getPaymentSessionId());
+                if (!order.getOrderNo().equals(session.getClientReferenceId())
+                        || !"paid".equals(session.getPaymentStatus()) || session.getPaymentIntent() == null) {
+                    throw new BusinessException("支付信息与订单不一致，请核查");
+                }
+                var params = com.stripe.param.RefundCreateParams.builder()
+                        .setPaymentIntent(session.getPaymentIntent()).setAmount(toMinorUnits(order.getTotal()))
+                        .putMetadata("after_sale_id", requestId).build();
+                var options = com.stripe.net.RequestOptions.builder().setIdempotencyKey("storm-refund-" + order.getOrderNo() + "-" + requestId).build();
+                refund = client.v1().refunds().create(params, options);
+            }
+            return new RefundState(refund.getId(), refund.getStatus());
+        } catch (StripeException e) {
+            throw new BusinessException("退款服务暂不可用，请稍后重试或在支付平台核查");
+        }
+    }
+
     /** 为订单创建 Stripe 付款页，返回要跳转的网址。baseUrl 用来拼返回本站的地址。 */
     public Checkout createCheckout(CustomerOrder order, String baseUrl, boolean english) {
         requireEnabled();

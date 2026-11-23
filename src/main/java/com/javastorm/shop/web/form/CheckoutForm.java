@@ -9,6 +9,12 @@ public class CheckoutForm {
     @NotBlank(message = "{checkout.name.required}")
     @Size(max = 50)
     private String customerName;
+    @jakarta.validation.constraints.Email
+    @Size(max = 254)
+    private String email;
+    public String getEmail() { return email; }
+    public void setEmail(String value) { email = value == null || value.isBlank() ? null : value.trim().toLowerCase(java.util.Locale.ROOT); }
+
 
     @NotBlank(message = "{checkout.phone.required}")
     @Pattern(regexp = "^[0-9+()\\- ]{6,30}$", message = "{checkout.phone.invalid}")

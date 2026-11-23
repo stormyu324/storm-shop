@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${en} ? 'en' : 'zh-CN'">
+<head th:replace="~{fragments/layout :: head(${en} ? 'Order lookup' : '订单查询')}"></head>
+<body th:attr="data-english=${en}">
+<header th:replace="~{fragments/layout :: storeHeader}"></header>
+<main class="container narrow">
+    <h1 th:text="${en} ? 'Your order, at a glance' : '订单进度，随时可查'"></h1>
+    <p class="muted" th:text="${en} ? 'Use the email entered at checkout to view delivery and request after-sales support.' : '使用下单时填写的邮箱验证，查看物流并申请售后。'"></p>
+    <p id="feedback" role="status" aria-live="polite"></p>
+    <form id="lookup" class="card">
+        <div class="field"><label for="number" th:text="${en} ? 'Order number' : '订单号'"></label><input id="number" required maxlength="32" autocomplete="off"></div>
+        <div class="field"><label for="email" th:text="${en} ? 'Email' : '下单邮箱'"></label><input id="email" type="email" required maxlength="254" autocomplete="email"></div>
+        <button type="submit" th:text="${en} ? 'Send verification code' : '发送验证码'"></button>
+    </form>
+    <form id="verify" class="card" hidden>
+        <div class="field"><label for="code" th:text="${en} ? 'Six-digit verification code' : '六位邮箱验证码'"></label><input id="code" required pattern="[0-9]{6}" maxlength="6" inputmode="numeric" autocomplete="one-time-code"></div>
+        <button type="submit" th:text="${en} ? 'View order' : '查看订单'"></button>
+    </form>
+    <section id="result" class="card" hidden>
+        <h2 id="order-title"></h2><p id="order-status"></p><p id="order-total"></p><p id="order-address"></p>
+        <ul id="order-items"></ul><p id="shipment"></p>
+        <a id="tracking" target="_blank" rel="noopener noreferrer" hidden th:text="${en} ? 'Track shipment' : '查看物流'"></a>
+        <h2 th:text="${en} ? 'After-sales history' : '售后处理记录'"></h2><ul id="cases"></ul>
+        <form id="after-sales">
+            <div class="field"><label for="reason" th:text="${en} ? 'Reason for full-order refund or support' : '整单退款或售后原因'"></label><textarea id="reason" required maxlength="1000" rows="3"></textarea></div>
+            <button type="submit" th:text="${en} ? 'Submit request' : '提交售后申请'"></button>
+        </form>
+        <div class="actions" style="margin-top:18px">
+            <button id="refresh" type="button" class="ghost" th:text="${en} ? 'Refresh status' : '刷新进度'"></button>
+            <button id="exit" type="button" class="ghost" th:text="${en} ? 'Close order' : '退出查询'"></button>
+        </div>
+    </section>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+<script th:src="@{/js/order-lookup.js}" defer></script>
+</body>
+</html>

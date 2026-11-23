@@ -24,6 +24,23 @@ public class CustomerOrder {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    private String email;
+    public String getEmail() { return email; }
+    public void setEmail(String value) { this.email = value; }
+    private String carrier;
+    public String getCarrier() { return carrier; }
+    public void setCarrier(String value) { this.carrier = value; }
+    private String trackingNumber;
+    public String getTrackingNumber() { return trackingNumber; }
+    public void setTrackingNumber(String value) { this.trackingNumber = value; }
+    @Column(length = 1000)
+    private String trackingUrl;
+    public String getTrackingUrl() { return trackingUrl; }
+    public void setTrackingUrl(String value) { this.trackingUrl = value; }
+    private java.time.LocalDateTime shippedAt;
+    public java.time.LocalDateTime getShippedAt() { return shippedAt; }
+    public void setShippedAt(java.time.LocalDateTime value) { this.shippedAt = value; }
+
 
     @Column(nullable = false, unique = true, length = 32)
     private String orderNo;

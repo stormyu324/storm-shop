@@ -10,6 +10,7 @@ export const ORDER_STATUS = {
   PAID: { label: '已付款', type: 'primary' },
   SHIPPED: { label: '已发货', type: 'success' },
   COMPLETED: { label: '已完成', type: 'info' },
+  REFUNDED: { label: '已退款', type: 'info' },
   CANCELLED: { label: '已取消', type: 'danger' }
 }
 

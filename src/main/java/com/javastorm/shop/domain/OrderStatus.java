@@ -8,6 +8,7 @@ public enum OrderStatus {
     PAID("已付款"),
     SHIPPED("已发货"),
     COMPLETED("已完成"),
+    REFUNDED("已退款"),
     CANCELLED("已取消");
 
     private final String label;
@@ -30,7 +31,7 @@ public enum OrderStatus {
             case PENDING_PAYMENT -> List.of(CANCELLED);
             case PLACED, PAID -> List.of(SHIPPED, CANCELLED);
             case SHIPPED -> List.of(COMPLETED, CANCELLED);
-            case COMPLETED, CANCELLED -> List.of();
+            case COMPLETED, CANCELLED, REFUNDED -> List.of();
         };
     }
 

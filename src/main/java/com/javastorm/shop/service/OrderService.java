@@ -37,8 +37,12 @@ public class OrderService {
     private final OrderRepository orders;
     private final Pricing pricing;
     private final ShippingService shipping;
+    private final OrderMailService mail;
+    private final com.javastorm.shop.repository.AfterSaleRepository afterSales;
 
-    public OrderService(ProductRepository products, OrderRepository orders, Pricing pricing, ShippingService shipping) {
+    public OrderService(ProductRepository products, OrderRepository orders, Pricing pricing, ShippingService shipping, OrderMailService mail, com.javastorm.shop.repository.AfterSaleRepository afterSales) {
+        this.afterSales=afterSales;
+        this.mail = mail;
         this.products = products;
         this.orders = orders;
         this.pricing = pricing;
@@ -98,6 +102,7 @@ public class OrderService {
         order.setAddress(form.getAddress().trim());
         order.setNote(form.getNote());
         order.setCountry(form.getCountry());
+        order.setEmail(form.getEmail());
         order.setCurrency(currency);
         if (awaitingPayment) {
             order.setStatus(OrderStatus.PENDING_PAYMENT);
@@ -128,6 +133,7 @@ public class OrderService {
         }
         order.addShippingFee(quote.fee());
         CustomerOrder saved = orders.save(order);
+        mail.order(saved, "PLACED", "订单已创建 / Your order was placed.");
         // 事务提交成功后才清空购物车；提交失败（例如并发抢购导致版本冲突）时顾客的购物车保持不变
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
@@ -164,6 +170,7 @@ public class OrderService {
             if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
                 order.setStatus(OrderStatus.PAID);
                 order.setPaidAt(LocalDateTime.now());
+                mail.order(order, "PAID", "付款已确认 / Payment confirmed.");
                 order.setPaymentSessionId(sessionId);
             } else if (order.getStatus() == OrderStatus.CANCELLED && order.getPaidAt() == null) {
                 log.error("订单 {} 已取消但收到了付款（Stripe session {}），请在 Stripe 后台退款", orderNo, sessionId);
@@ -187,6 +194,7 @@ public class OrderService {
             }
         }
         order.setStatus(OrderStatus.CANCELLED);
+        mail.order(order, "CANCELLED", "订单已取消 / Order cancelled.");
         return items;
     }
 
@@ -204,11 +212,21 @@ public class OrderService {
     @Transactional
     public void changeStatus(Long orderId, OrderStatus status) {
         CustomerOrder order = orders.findForUpdate(orderId).orElseThrow(() -> new BusinessException("订单不存在"));
+        if (afterSales.findByOrderIdOrderByIdDesc(orderId).stream()
+                .anyMatch(a -> !"REJECTED".equals(a.state))) {
+            throw new BusinessException("请先处理该订单的售后申请");
+        }
         if (order.getStatus() == status) {
             return;
         }
         if (!order.getStatus().canChangeTo(status)) {
             throw new BusinessException("订单「" + order.getStatus().getLabel() + "」不能改为「" + status.getLabel() + "」");
+        }
+        if (status == OrderStatus.CANCELLED && order.getPaidAt()!=null) {
+            throw new BusinessException("已付款订单请通过售后流程办理退款");
+        }
+        if (status == OrderStatus.SHIPPED && order.getShippedAt()==null) {
+            order.setShippedAt(LocalDateTime.now());
         }
         if (status == OrderStatus.CANCELLED) {
             for (OrderItem item : order.getItems()) {
@@ -219,5 +237,6 @@ public class OrderService {
             }
         }
         order.setStatus(status);
+        mail.order(order, status.name(), status.getLabel());
     }
 }

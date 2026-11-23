@@ -54,6 +54,7 @@
             <el-button v-for="s in row.nextStatuses" :key="s" link :type="s === 'CANCELLED' ? 'danger' : 'primary'" @click="change(row, s)">
               {{ actionLabel(s) }}
             </el-button>
+            <el-button link type="primary" @click="care.open(row)">物流与售后</el-button>
             <span v-if="!row.nextStatuses.length" class="muted small">—</span>
           </template>
         </el-table-column>
@@ -63,11 +64,14 @@
                        :current-page="pageNo + 1" @current-change="p => { pageNo = p - 1; load() }" />
       </div>
     </el-card>
+    <OrderCare ref="care" @changed="load" />
   </div>
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue'
+import OrderCare from '../components/OrderCare.vue'
+const care = ref(null)
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api, errorText } from '../api'
@@ -107,6 +111,7 @@ function onTab() {
 }
 
 async function change(row, status) {
+  if (status === 'SHIPPED') { care.value.open(row); return }
   if (status === 'CANCELLED') {
     await ElMessageBox.confirm(
       row.status === 'PAID' || row.status === 'SHIPPED'

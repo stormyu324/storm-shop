@@ -51,7 +51,7 @@ public final class StoreDtos {
     public record QuoteRequest(
             @Schema(description = "不传时按语言：中文 CNY，英文 USD") Currency currency,
             @Schema(description = "寄往国家，ISO 两位代码，如 US", example = "US") String country,
-            @NotEmpty @Size(max = 50) List<@Valid CartItem> items) {
+            @NotEmpty @Size(max = 50) List<@Valid CartItem> items, @jakarta.validation.constraints.Email @Size(max = 254) String email) {
     }
 
     public record QuoteLine(Long productId, String title, int quantity, BigDecimal unitPrice, BigDecimal subtotal,
@@ -68,7 +68,7 @@ public final class StoreDtos {
             Currency currency,
             @NotNull String customerName, @NotNull String phone, @NotNull String address, String note,
             @NotNull @Schema(example = "US") String country,
-            @NotEmpty @Size(max = 50) List<@Valid CartItem> items) {
+            @NotEmpty @Size(max = 50) List<@Valid CartItem> items, @jakarta.validation.constraints.Email @Size(max = 254) String email) {
     }
 
     public record OrderCreated(

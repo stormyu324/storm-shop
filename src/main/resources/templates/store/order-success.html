@@ -10,6 +10,7 @@
         <p><th:block th:text="#{order.no}">订单号：</th:block><strong class="mono" th:text="${order.orderNo}"></strong></p>
         <p><th:block th:text="${paid} ? #{order.paidAmount} : #{order.amount}">应付金额：</th:block><span class="price" th:text="${@pricing.format(order.total, order.currency)}"></span></p>
         <p class="muted" th:unless="${paid != null or processing != null}"><th:block th:text="#{order.receiver}">收货人：</th:block><span th:text="${order.customerName}"></span>, <span th:text="${order.address}"></span></p>
+        <a th:href="@{/orders/lookup}" class="btn ghost" th:text="${en} ? 'Track this order' : '查询订单与售后'"></a>
         <a th:href="@{/}" class="btn" th:text="#{order.continue}">继续购物</a>
     </div>
 </main>
