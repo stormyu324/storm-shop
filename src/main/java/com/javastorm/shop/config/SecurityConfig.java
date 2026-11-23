@@ -28,11 +28,17 @@ public class SecurityConfig {
      */
     @Bean
     @Order(1)
-    SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain apiSecurityFilterChain(HttpSecurity http, StaffSessionFilter staffSessions) throws Exception {
         http
                 .securityMatcher("/api/**")
+                .addFilterBefore(staffSessions, org.springframework.security.web.authentication.AnonymousAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/admin/session").permitAll()
+                         .requestMatchers("/api/admin/staff/**","/api/admin/audit/**","/api/admin/orders/*/after-sales/*").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/orders/**").hasAnyRole("ADMIN","SUPPORT")
+                        .requestMatchers("/api/admin/coupons/**","/api/admin/analytics/**").hasAnyRole("ADMIN","OPERATIONS")
+                        .requestMatchers("/api/admin/products/**","/api/admin/categories/**","/api/admin/shipping/**","/api/admin/ai/**","/api/admin/export/**").hasAnyRole("ADMIN","CATALOG")
+                        .requestMatchers("/api/admin/dashboard").hasAnyRole("ADMIN","STAFF")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().permitAll())
                 .csrf(csrf -> csrf
@@ -75,12 +81,19 @@ public class SecurityConfig {
     UserDetailsService adminUsers(@Value("${shop.admin.username}") String username,
                                   @Value("${shop.admin.password}") String password,
                                   @Value("${shop.admin.require-strong-password:false}") boolean requireStrong,
-                                  PasswordEncoder encoder) {
+                                  PasswordEncoder encoder, com.javastorm.shop.repository.StaffRepository staff) {
         checkPassword(password, requireStrong);
-        return new InMemoryUserDetailsManager(User.withUsername(username)
+        InMemoryUserDetailsManager owner = new InMemoryUserDetailsManager(User.withUsername(username)
                 .password(encoder.encode(password))
                 .roles("ADMIN")
                 .build());
+        return loginName -> {
+            if(owner.userExists(loginName)) return owner.loadUserByUsername(loginName);
+            var account=staff.findByUsername(loginName).orElseThrow(() ->
+                    new org.springframework.security.core.userdetails.UsernameNotFoundException("账号不存在"));
+            return User.withUsername(account.username).password(account.passwordHash)
+                    .roles("STAFF",account.role).disabled(!account.enabled).build();
+        };
     }
 
     /** 生产环境（prod）下拒绝用默认密码或过短的密码启动，开发环境只打印警告。 */

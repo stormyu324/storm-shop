@@ -38,9 +38,11 @@ public class OrderService {
     private final Pricing pricing;
     private final ShippingService shipping;
     private final OrderMailService mail;
+    private final CouponService coupons;
     private final com.javastorm.shop.repository.AfterSaleRepository afterSales;
 
-    public OrderService(ProductRepository products, OrderRepository orders, Pricing pricing, ShippingService shipping, OrderMailService mail, com.javastorm.shop.repository.AfterSaleRepository afterSales) {
+    public OrderService(ProductRepository products, OrderRepository orders, Pricing pricing, ShippingService shipping, OrderMailService mail, com.javastorm.shop.repository.AfterSaleRepository afterSales, CouponService coupons) {
+        this.coupons=coupons;
         this.afterSales=afterSales;
         this.mail = mail;
         this.products = products;
@@ -132,6 +134,10 @@ public class OrderService {
                     Countries.name(form.getCountry(), english ? java.util.Locale.ENGLISH : java.util.Locale.SIMPLIFIED_CHINESE));
         }
         order.addShippingFee(quote.fee());
+        coupons.reserve(order,form.getCouponCode());
+        if(order.getTotal().signum()==0) {
+            order.setStatus(OrderStatus.PAID);order.setPaidAt(LocalDateTime.now());
+        }
         CustomerOrder saved = orders.save(order);
         mail.order(saved, "PLACED", "订单已创建 / Your order was placed.");
         // 事务提交成功后才清空购物车；提交失败（例如并发抢购导致版本冲突）时顾客的购物车保持不变
@@ -193,6 +199,7 @@ public class OrderService {
                 products.findById(item.getProductId()).ifPresent(p -> p.setStock(p.getStock() + item.getQuantity()));
             }
         }
+        coupons.release(order);
         order.setStatus(OrderStatus.CANCELLED);
         mail.order(order, "CANCELLED", "订单已取消 / Order cancelled.");
         return items;
@@ -229,6 +236,7 @@ public class OrderService {
             order.setShippedAt(LocalDateTime.now());
         }
         if (status == OrderStatus.CANCELLED) {
+            coupons.release(order);
             for (OrderItem item : order.getItems()) {
                 if (item.getProductId() != null) {
                     products.findById(item.getProductId())

@@ -9,7 +9,10 @@
         </router-link>
       </el-col>
     </el-row>
-    <el-card>
+    <el-card v-if="can('OPERATIONS')" style="margin-bottom:18px">
+      <h3>运营工作台</h3><div class="actions"><router-link to="/analytics">查看运营数据</router-link><router-link to="/coupons">管理优惠券</router-link></div>
+    </el-card>
+    <el-card v-if="can('CATALOG')">
       <h3 class="section-title">快速上架</h3>
       <div class="quick">
         <router-link to="/products/new" class="quick-item">
@@ -29,6 +32,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { api } from '../api'
+import { can } from '../auth'
 
 const data = ref(null)
 const loading = ref(true)
@@ -42,7 +46,7 @@ const stats = computed(() => {
     { label: `库存 ≤ ${d.lowStockThreshold ?? 5} 的在售商品`, value: d.lowStock ?? '-', warn: d.lowStock > 0, to: { path: '/products', query: { status: 'ON_SALE' } } },
     { label: '待发货订单', value: d.ordersToFulfil ?? '-', warn: d.ordersToFulfil > 0, to: { path: '/orders', query: { tab: 'todo' } } },
     { label: '待付款订单', value: d.awaitingPayment ?? '-', to: { path: '/orders', query: { tab: 'PENDING_PAYMENT' } } }
-  ]
+  ].filter(s => can(s.to.path === '/orders' ? 'SUPPORT' : 'CATALOG'))
 })
 
 onMounted(async () => {

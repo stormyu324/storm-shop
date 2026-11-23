@@ -36,9 +36,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminSessionApi {
 
     private final AuthenticationProvider authProvider;
+    private final com.javastorm.shop.repository.StaffRepository staff;
     private final SecurityContextRepository contextRepository = new HttpSessionSecurityContextRepository();
 
-    public AdminSessionApi(UserDetailsService users, PasswordEncoder encoder) {
+    public AdminSessionApi(UserDetailsService users, PasswordEncoder encoder, com.javastorm.shop.repository.StaffRepository staff) {
+        this.staff=staff;
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(users);
         provider.setPasswordEncoder(encoder);
@@ -62,6 +64,8 @@ public class AdminSessionApi {
             return ResponseEntity.status(401).body(ApiError.of("用户名或密码错误"));
         }
         request.getSession(true);
+        staff.findByUsername(auth.getName()).ifPresent(account ->
+                request.getSession().setAttribute("staffCredentialVersion",account.credentialVersion));
         request.changeSessionId(); // 防止会话固定攻击
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(auth);
@@ -79,7 +83,7 @@ public class AdminSessionApi {
 
     private static SessionInfo info(Authentication auth, CsrfToken csrf) {
         boolean admin = auth != null && auth.isAuthenticated()
-                && auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
-        return new SessionInfo(admin, admin ? auth.getName() : null, csrf == null ? null : csrf.getToken());
+                && auth.getAuthorities().stream().anyMatch(a -> java.util.Set.of("ROLE_ADMIN","ROLE_STAFF").contains(a.getAuthority()));
+        return new SessionInfo(admin, admin ? auth.getName() : null, csrf == null ? null : csrf.getToken(), admin ? auth.getAuthorities().stream().map(a -> a.getAuthority().replace("ROLE_","")).toList() : java.util.List.of());
     }
 }

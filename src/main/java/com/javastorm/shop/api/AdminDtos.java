@@ -20,7 +20,7 @@ public final class AdminDtos {
     }
 
     public record SessionInfo(boolean authenticated, String username,
-                              @Schema(description = "CSRF 令牌：修改类请求放在请求头 X-XSRF-TOKEN") String csrfToken) {
+                              @Schema(description = "CSRF 令牌：修改类请求放在请求头 X-XSRF-TOKEN") String csrfToken, List<String> roles) {
     }
 
     public record LoginRequest(@NotBlank String username, @NotBlank String password) {
@@ -102,7 +102,7 @@ public final class AdminDtos {
             Currency currency, BigDecimal itemsTotal, BigDecimal shippingFee, BigDecimal total,
             String customerName, String phone, String country, String address, String note,
             List<OrderLine> items, LocalDateTime createdAt, LocalDateTime paidAt,
-            String email,String carrier,String trackingNumber,String trackingUrl,LocalDateTime shippedAt) {
+            String email,String carrier,String trackingNumber,String trackingUrl,LocalDateTime shippedAt, BigDecimal discountAmount, String couponCode) {
     }
 
     public record StatusChange(@NotNull OrderStatus status) {

@@ -19,6 +19,7 @@
             <button type="submit" th:text="#{nav.search}">搜索</button>
         </form>
         <nav class="topnav">
+            <a th:href="@{/account}" th:text="${en} ? 'My account' : '会员中心'"></a>
             <a th:href="@{/orders/lookup}" th:text="${en} ? 'Order lookup' : '订单查询'"></a>
             <a th:href="${en} ? '?lang=zh' : '?lang=en'" th:title="#{lang.switch.title}" class="lang-switch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/></svg><span th:text="#{lang.switch}">EN</span></a>
             <a th:href="@{/cart}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.6l2.4 12.2a1.6 1.6 0 0 0 1.6 1.3h8.7a1.6 1.6 0 0 0 1.6-1.2L21 7H6"/></svg><span class="nav-label" th:text="#{nav.cart}">购物车</span> <span class="badge" th:if="${cartCount > 0}" th:text="${cartCount}">0</span></a>

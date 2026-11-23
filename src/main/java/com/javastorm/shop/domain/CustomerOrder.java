@@ -24,6 +24,19 @@ public class CustomerOrder {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    private Long couponId;
+    private String couponCode;
+    @Column(precision=12,scale=2) private BigDecimal discountAmount;
+    private Boolean couponReleased;
+    public Long getCouponId() { return couponId; }
+    public String getCouponCode() { return couponCode; }
+    public BigDecimal getDiscountAmount() { return discountAmount==null ? BigDecimal.ZERO : discountAmount; }
+    public boolean isCouponReleased() { return Boolean.TRUE.equals(couponReleased); }
+    public void setCouponReleased(boolean value) { couponReleased=value; }
+    public void applyDiscount(Long id,String code,BigDecimal amount) {
+        couponId=id;couponCode=code;discountAmount=amount;couponReleased=false;total=total.subtract(amount);
+    }
+
     private String email;
     public String getEmail() { return email; }
     public void setEmail(String value) { this.email = value; }
@@ -197,7 +210,7 @@ public class CustomerOrder {
 
     /** 商品金额（不含运费）。 */
     public BigDecimal getItemsTotal() {
-        return total.subtract(getShippingFee());
+        return total.add(getDiscountAmount()).subtract(getShippingFee());
     }
 
     /** 设置运费并计入订单总额；只能在下单时调用一次。 */

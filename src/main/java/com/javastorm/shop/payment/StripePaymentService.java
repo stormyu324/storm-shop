@@ -125,7 +125,10 @@ public class StripePaymentService {
                 .setCancelUrl(baseUrl + "/checkout/cancel")
                 .setExpiresAt(Instant.now().plus(SESSION_TTL).plusSeconds(60).getEpochSecond())
                 .setLocale(english ? SessionCreateParams.Locale.EN : SessionCreateParams.Locale.AUTO);
-        for (OrderItem item : order.getItems()) {
+        if (order.getDiscountAmount().signum()>0) {
+            BigDecimal discountedItems=order.getItemsTotal().subtract(order.getDiscountAmount());
+            if(discountedItems.signum()>0) params.addLineItem(lineItem(english ? "Discounted items" : "优惠后商品",discountedItems,1,currency));
+        } else for (OrderItem item : order.getItems()) {
             params.addLineItem(lineItem(item.getProductName() + (item.getSku() == null ? "" : " (" + item.getSku() + ")"),
                     item.getUnitPrice(), item.getQuantity(), currency));
         }

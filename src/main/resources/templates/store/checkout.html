@@ -29,6 +29,7 @@
         </table>
     </div>
     <form class="card" th:action="@{/checkout}" th:object="${form}" method="post">
+        <div class="field" id="saved-addresses" hidden><label for="saved-address">会员地址 / Saved address</label><select id="saved-address"><option value="">手动填写 / Enter manually</option></select></div>
         <div class="field">
             <label for="email" th:text="${en} ? 'Email for order updates and secure lookup' : '邮箱（接收通知与查询验证码）'"></label>
             <input id="email" type="email" th:field="*{email}" maxlength="254" autocomplete="email">
@@ -65,6 +66,10 @@
             <label for="note" th:text="#{checkout.note}">备注（可选）</label>
             <input id="note" th:field="*{note}" maxlength="500">
         </div>
+        <div class="field"><label for="couponCode">优惠码 / Coupon code</label><input id="couponCode" th:field="*{couponCode}" maxlength="40">
+          <button type="button" class="ghost" id="applyCoupon">试算优惠 / Apply code</button>
+          <p id="couponFeedback" role="status"></p><p id="couponDiscount" class="muted"></p>
+        </div>
         <p class="muted" th:text="${onlinePayment} ? #{checkout.onlinePayment} : #{checkout.noPayment}">本店暂未接入在线支付</p>
         <button type="submit" id="submitOrder" th:disabled="${!cart.deliverable}"
                 th:text="${onlinePayment} ? #{checkout.submitPay} : #{checkout.submit}">提交订单</button>
@@ -76,9 +81,11 @@
         var select = document.getElementById('country');
         if (!select) return;
         select.addEventListener('change', function () {
-            fetch('/checkout/shipping?country=' + encodeURIComponent(select.value), {headers: {'Accept': 'application/json'}})
-                .then(function (res) { return res.json(); })
+            fetch('/checkout/shipping?country=' + encodeURIComponent(select.value) + '&couponCode=' + encodeURIComponent(document.getElementById('couponCode').value), {headers: {'Accept': 'application/json'}})
+                .then(function (res) { if (!res.ok) throw new Error('优惠码不可用 / Coupon unavailable'); return res.json(); })
                 .then(function (d) {
+                    document.getElementById('couponFeedback').textContent = '';
+                    document.getElementById('couponDiscount').textContent = '优惠 / Discount ' + d.discount;
                     document.getElementById('shippingFee').textContent = d.shipping;
                     document.getElementById('grandTotal').textContent = d.total;
                     document.getElementById('freeHint').textContent = d.freeHint || '';
@@ -86,9 +93,11 @@
                     notice.textContent = d.notice || '';
                     notice.style.display = d.deliverable ? 'none' : '';
                     document.getElementById('submitOrder').disabled = !d.deliverable;
-                });
+                }).catch(function (e) { document.getElementById('couponFeedback').textContent = e.message; });
         });
+        document.getElementById('applyCoupon').addEventListener('click', function () { select.dispatchEvent(new Event('change')); });
     })();
 </script>
+<script th:src="@{/js/member-checkout.js}" defer></script>
 </body>
 </html>

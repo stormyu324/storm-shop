@@ -38,7 +38,7 @@
         el('result').hidden = false; el('verify').hidden = true; el('lookup').hidden = true;
         el('order-title').textContent = text('订单 ', 'Order ') + o.orderNo;
         el('order-status').textContent = en ? o.status : o.statusLabel;
-        el('order-total').textContent = o.currency + ' ' + o.total;
+        el('order-total').textContent = o.currency + ' ' + o.total + (Number(o.discountAmount) > 0 ? ' · 优惠 / Discount ' + o.discountAmount : '');
         el('order-address').textContent = o.customerName + ' · ' + o.address;
         el('order-items').replaceChildren();
         o.items.forEach(i => item(el('order-items'), i.productName + ' × ' + i.quantity + ' · ' + o.currency + ' ' + i.subtotal));
@@ -82,5 +82,7 @@
     el('exit').addEventListener('click', async () => {
         try { await request('/session', 'DELETE'); location.reload(); } catch (e) { feedback(e.message); }
     });
-    ready.catch(error => feedback(error.message));
+    ready.then(() => {
+        if (new URLSearchParams(location.search).get('current') === '1') return load();
+    }).catch(error => feedback(error.message));
 })();

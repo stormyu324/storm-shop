@@ -69,12 +69,18 @@ public class StoreApiController {
     private final SiteUrls siteUrls;
     private final ApiMapper mapper;
     private final Validator validator;
+    private final com.javastorm.shop.service.CouponService coupons;
+    private final com.javastorm.shop.service.MemberService members;
+    private final jakarta.servlet.http.HttpSession memberSession;
     private final com.javastorm.shop.service.OrderSubmissionGuard submissions;
 
     public StoreApiController(ProductService productService, ProductRepository products, CategoryRepository categories,
                               VariantService variantService, OrderService orderService, OrderPlacer orderPlacer,
                               StripePaymentService stripe, PaymentFlow paymentFlow, SiteUrls siteUrls,
-                              ApiMapper mapper, Validator validator, com.javastorm.shop.service.OrderSubmissionGuard submissions) {
+                              ApiMapper mapper, Validator validator, com.javastorm.shop.service.OrderSubmissionGuard submissions,
+            com.javastorm.shop.service.CouponService coupons,com.javastorm.shop.service.MemberService members,
+            jakarta.servlet.http.HttpSession memberSession) {
+        this.coupons=coupons;this.members=members;this.memberSession=memberSession;
         this.submissions = submissions;
         this.productService = productService;
         this.products = products;
@@ -150,7 +156,7 @@ public class StoreApiController {
         boolean en = LocaleConfig.isEnglish();
         return new Quote(view.lines().stream().map(l -> new QuoteLine(l.product().getId(), l.product().title(en),
                         l.quantity(), l.unitPrice(), l.getSubtotal(), l.isAvailable())).toList(),
-                view.subtotal(), view.shipping(), view.total(), cur, country, view.deliverable(), view.freeRemaining());
+                view.subtotal(), view.shipping(), view.total().subtract(coupons.preview(req.couponCode(),view.subtotal(),cur)), cur, country, view.deliverable(), view.freeRemaining(), coupons.preview(req.couponCode(),view.subtotal(),cur));
     }
 
     @PostMapping("/orders")
@@ -177,6 +183,9 @@ public class StoreApiController {
         form.setAddress(req.address());
         form.setNote(req.note());
         form.setEmail(req.email());
+        var member=members.current(memberSession);
+        if(member!=null) form.setEmail(member.email);
+        form.setCouponCode(req.couponCode());
         form.setCountry(req.country());
         Map<String, String> errors = new LinkedHashMap<>();
         for (ConstraintViolation<CheckoutForm> v : validator.validate(form)) {
@@ -190,11 +199,11 @@ public class StoreApiController {
         }
         boolean online = stripe.isEnabledFor(cur);
         CustomerOrder order = orderPlacer.place(cartOf(req.items()), form, cur, online);
-        String paymentUrl = online
+        String paymentUrl = online && order.getStatus()==com.javastorm.shop.domain.OrderStatus.PENDING_PAYMENT
                 ? paymentFlow.startPayment(order, null, siteUrls.baseUrl(), cur == Currency.USD)
                 : null;
         return new OrderCreated(order.getOrderNo(), order.getStatus().name(), order.getCurrency(),
-                order.getItemsTotal(), order.getShippingFee(), order.getTotal(), paymentUrl);
+                order.getItemsTotal(), order.getShippingFee(), order.getTotal(), paymentUrl, order.getDiscountAmount(), order.getCouponCode());
     }
 
     private static Cart cartOf(List<CartItem> items) {

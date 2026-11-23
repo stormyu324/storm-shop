@@ -50,11 +50,14 @@ public class CartController {
     private final OrderPlacer orderPlacer;
     private final HttpSession session;
     private final Pricing pricing;
+    private final com.javastorm.shop.service.CouponService coupons;
+    private final com.javastorm.shop.service.MemberService members;
 
     public CartController(Cart cart, OrderService orderService, ProductRepository products,
                           MessageSource messages, GlobalModelAdvice advice, StripePaymentService stripe,
                           PaymentFlow paymentFlow, SiteUrls siteUrls, OrderPlacer orderPlacer,
-                          HttpSession session, Pricing pricing) {
+                          HttpSession session, Pricing pricing, com.javastorm.shop.service.CouponService coupons, com.javastorm.shop.service.MemberService members) {
+        this.coupons=coupons;this.members=members;
         this.siteUrls = siteUrls;
         this.orderPlacer = orderPlacer;
         this.session = session;
@@ -112,6 +115,8 @@ public class CartController {
         }
         CheckoutForm form = new CheckoutForm();
         form.setCountry(shipCountry());
+        var member=members.current(session);
+        if(member!=null) form.setEmail(member.email);
         model.addAttribute("cart", view);
         model.addAttribute("form", form);
         model.addAttribute("countries", Countries.list(LocaleContextHolder.getLocale()));
@@ -121,7 +126,7 @@ public class CartController {
     /** 结账页切换国家时重新计算运费（页面上用 JavaScript 调用）。 */
     @GetMapping("/checkout/shipping")
     @ResponseBody
-    public Map<String, Object> shippingFor(@RequestParam String country) {
+    public Map<String, Object> shippingFor(@RequestParam String country,@RequestParam(required=false) String couponCode) {
         if (Countries.isValid(country)) {
             session.setAttribute(SHIP_COUNTRY, country.toUpperCase(Locale.ROOT));
         }
@@ -132,7 +137,9 @@ public class CartController {
         body.put("shipping", !view.deliverable() ? "—" : view.shipping().signum() == 0
                 ? messages.getMessage("cart.shippingFree", null, locale)
                 : pricing.format(view.shipping(), view.currency()));
-        body.put("total", pricing.format(view.total(), view.currency()));
+        var discount=coupons.preview(couponCode,view.subtotal(),view.currency());
+        body.put("discount",pricing.format(discount,view.currency()));
+        body.put("total", pricing.format(view.total().subtract(discount), view.currency()));
         body.put("freeHint", view.freeRemaining() == null ? null
                 : messages.getMessage("cart.freeShippingHint",
                 new Object[]{pricing.format(view.freeRemaining(), view.currency())}, locale));
@@ -161,10 +168,12 @@ public class CartController {
             return "store/checkout";
         }
         try {
+            var member=members.current(httpSession);
+            if(member!=null) form.setEmail(member.email);
             Currency currency = LocaleConfig.currentCurrency();
             boolean online = stripe.isEnabledFor(currency);
             CustomerOrder order = orderPlacer.place(cart, form, currency, online);
-            if (online) {
+            if (online && order.getStatus()==com.javastorm.shop.domain.OrderStatus.PENDING_PAYMENT) {
                 String url = paymentFlow.startPayment(order, cart, siteUrls.baseUrl(), LocaleConfig.isEnglish());
                 httpSession.setAttribute(PaymentController.PENDING_ORDER, order.getOrderNo());
                 return "redirect:" + url;

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${en} ? 'en' : 'zh-CN'">
+<head th:replace="~{fragments/layout :: head(${en} ? 'My account' : '会员中心')}"></head>
+<body><header th:replace="~{fragments/layout :: storeHeader}"></header>
+<main class="container narrow">
+<h1 th:text="${en} ? 'My account' : '会员中心'"></h1>
+<p class="muted">邮箱验证登录后，可以管理地址、查看历史订单和收藏商品。 / Verify your email to manage addresses, orders and saved products.</p>
+<p id="member-feedback" role="status" aria-live="polite"></p>
+<form id="member-login" class="card">
+ <div class="field"><label for="member-email">邮箱 / Email</label><input id="member-email" required type="email" maxlength="254" autocomplete="email"></div>
+ <button type="submit">发送验证码 / Send code</button>
+</form>
+<form id="member-verify" class="card" hidden>
+ <div class="field"><label for="member-code">六位验证码 / Six-digit code</label><input id="member-code" required pattern="[0-9]{6}" maxlength="6" inputmode="numeric" autocomplete="one-time-code"></div>
+ <button type="submit">验证并登录 / Sign in</button>
+</form>
+<div id="member-content" hidden>
+ <div class="card actions"><strong id="member-identity"></strong><button id="member-logout" class="ghost" type="button">退出登录 / Sign out</button></div>
+ <section class="card"><h2>地址簿 / Address book</h2><div id="member-addresses"></div>
+ <form id="address-form">
+  <div class="grid-2">
+   <div class="field"><label for="address-name">收货人 / Name</label><input id="address-name" required maxlength="50" autocomplete="name"></div>
+   <div class="field"><label for="address-phone">电话 / Phone</label><input id="address-phone" required maxlength="30" autocomplete="tel"></div>
+  </div>
+  <div class="field"><label for="address-country">国家 / Country</label><select id="address-country" required></select></div>
+  <div class="field"><label for="address-text">地址 / Address</label><input id="address-text" required maxlength="300" autocomplete="street-address"></div>
+  <p><label><input id="address-preferred" type="checkbox"> 默认地址 / Default address</label></p>
+  <div class="actions"><button type="submit">保存地址 / Save address</button><button id="address-new" class="ghost" type="button">新建地址 / New address</button></div>
+ </form></section>
+ <section class="card"><h2>历史订单 / Order history</h2><div id="member-orders"></div>
+ <div class="actions"><button id="orders-previous" type="button" class="ghost">上一页 / Previous</button><button id="orders-next" type="button" class="ghost">下一页 / Next</button></div></section>
+ <section class="card"><h2>收藏商品 / Saved products</h2><div id="member-favorites"></div></section>
+</div>
+</main><footer th:replace="~{fragments/layout :: footer}"></footer>
+<script th:src="@{/js/member.js}" defer></script></body></html>

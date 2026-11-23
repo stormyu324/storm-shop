@@ -15,6 +15,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class OrderCareService {
   private final OrderRepository orders;
+  private final CouponService coupons;
   private final AfterSaleRepository cases;
   private final ProductRepository products;
   private final OrderMailService mail;
@@ -29,7 +30,8 @@ public class OrderCareService {
       OrderMailService mail,
       StripePaymentService stripe,
       PlatformTransactionManager manager,
-      AfterSaleHistoryRepository history) {
+      AfterSaleHistoryRepository history, CouponService coupons) {
+    this.coupons=coupons;
     this.history = history;
     this.orders = orders;
     this.cases = cases;
@@ -178,6 +180,7 @@ public class OrderCareService {
                         .ifPresent(p -> p.setStock(p.getStock() + i.getQuantity()));
                 });
       }
+      coupons.release(order);
       order.setStatus(OrderStatus.REFUNDED);
     }
     a.state = "SUCCEEDED";

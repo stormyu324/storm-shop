@@ -1,5 +1,6 @@
 // 调用后端 /api 接口：自动带上登录 Cookie 和 CSRF 令牌，出错时抛出带说明的 ApiError
 import router from './router'
+import { auth } from './auth'
 
 export class ApiError extends Error {
   constructor(status, message, fields) {
@@ -40,6 +41,9 @@ export async function request(method, url, body, { form = false } = {}) {
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
     if (res.status === 401 && !url.startsWith('/api/admin/session')) {
+      auth.authenticated = false
+      auth.loaded = false
+      auth.roles = []
       router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
     }
     throw new ApiError(res.status, data.message || `请求失败（${res.status}）`, data.fields)

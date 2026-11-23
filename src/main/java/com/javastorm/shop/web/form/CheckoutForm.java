@@ -26,6 +26,10 @@ public class CheckoutForm {
 
     @Size(max = 500)
     private String note;
+    @Size(max=40) private String couponCode;
+    public String getCouponCode() { return couponCode; }
+    public void setCouponCode(String value) { couponCode=value; }
+
 
     /** 寄往国家 / 地区，ISO 两位代码。 */
     @NotBlank(message = "{checkout.country.required}")

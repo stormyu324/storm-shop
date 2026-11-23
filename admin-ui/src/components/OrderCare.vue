@@ -17,9 +17,9 @@
         <p>{{ labels[c.state] || c.state }} · {{ dateTime(c.createdAt) }}</p>
         <p>{{ c.reason }}</p>
         <ul><li v-for="(h, index) in c.history" :key="index">{{ dateTime(h.createdAt) }} · {{ labels[h.state] || h.state }} {{ h.note }}</li></ul><p v-if="c.decisionNote">{{ c.decisionNote }}</p>
-        <el-button v-if="['REQUESTED','FAILED'].includes(c.state)" :disabled="busy" @click="decide(c, 'APPROVE')">批准全额退款</el-button>
-        <el-button v-if="c.state === 'REQUESTED'" :disabled="busy" @click="decide(c, 'REJECT')">驳回</el-button>
-        <el-button v-if="c.state === 'MANUAL_REQUIRED'" :disabled="busy" @click="decide(c, 'CONFIRM_MANUAL')">确认线下退款已完成</el-button>
+        <el-button v-if="can('ADMIN') && ['REQUESTED','FAILED'].includes(c.state)" :disabled="busy" @click="decide(c, 'APPROVE')">批准全额退款</el-button>
+        <el-button v-if="can('ADMIN') && c.state === 'REQUESTED'" :disabled="busy" @click="decide(c, 'REJECT')">驳回</el-button>
+        <el-button v-if="can('ADMIN') && c.state === 'MANUAL_REQUIRED'" :disabled="busy" @click="decide(c, 'CONFIRM_MANUAL')">确认线下退款已完成</el-button>
       </el-card>
       <el-button :disabled="busy" @click="createCase">代顾客登记售后</el-button>
       <el-button :disabled="busy" @click="execute(reload)">刷新进度</el-button>
@@ -30,6 +30,7 @@
 import { ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api, errorText } from '../api'
+import { can } from '../auth'
 import { dateTime } from '../format'
 const emit = defineEmits(['changed'])
 const visible = ref(false)

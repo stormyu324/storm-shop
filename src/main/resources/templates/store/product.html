@@ -20,6 +20,7 @@
         </div>
         <div>
             <h1 th:text="${product.title(en)}">商品名称</h1>
+            <p><button id="save-favorite" type="button" class="ghost" th:attr="data-product-id=${product.id}" th:text="${en} ? 'Save product' : '收藏商品'"></button><span id="favorite-feedback" role="status"></span></p>
             <div class="price-box">
                 <span class="price" th:text="${@pricing.formatPrice(product, currency)}">¥0.00</span>
                 <span class="orig" th:if="${product.hasDiscount()}" th:text="${@pricing.formatOriginalPrice(product, currency)}"></span>
@@ -85,5 +86,6 @@
         });
     });
 </script>
+<script th:src="@{/js/member-checkout.js}" defer></script>
 </body>
 </html>

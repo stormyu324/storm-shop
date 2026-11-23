@@ -21,6 +21,7 @@
                   {{ i.productName }} <span class="muted mono">{{ i.sku }}</span> × {{ i.quantity }}　{{ money(i.subtotal, row.currency) }}
                 </p>
                 <p class="muted">商品 {{ money(row.itemsTotal, row.currency) }} + 运费 {{ money(row.shippingFee, row.currency) }}</p>
+                <p v-if="Number(row.discountAmount)>0">优惠 {{ row.couponCode }} 减 {{ money(row.discountAmount,row.currency) }}</p>
               </div>
               <div><b>时间</b>
                 <p>下单：{{ dateTime(row.createdAt) }}</p>

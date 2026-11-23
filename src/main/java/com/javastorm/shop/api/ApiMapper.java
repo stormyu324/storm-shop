@@ -78,6 +78,6 @@ public class ApiMapper {
                 o.getCustomerName(), o.getPhone(), o.getCountry(), o.getAddress(), o.getNote(),
                 o.getItems().stream().map(i -> new OrderLine(i.getProductId(), i.getProductName(), i.getSku(),
                         i.getUnitPrice(), i.getQuantity(), i.getSubtotal())).toList(),
-                o.getCreatedAt(), o.getPaidAt(), o.getEmail(), o.getCarrier(), o.getTrackingNumber(), o.getTrackingUrl(), o.getShippedAt());
+                o.getCreatedAt(), o.getPaidAt(), o.getEmail(), o.getCarrier(), o.getTrackingNumber(), o.getTrackingUrl(), o.getShippedAt(), o.getDiscountAmount(), o.getCouponCode());
     }
 }
