@@ -36,8 +36,21 @@ public class DemoDataInitializer implements ApplicationRunner {
         Category home = category("家居", "Home");
         Category digital = category("数码", "Electronics");
 
-        product("纯棉圆领T恤", "DEMO-001", clothing, "59.00", "99.00", 120, "100% 纯棉面料，柔软透气，四季百搭。",
-                "Classic Cotton Crew Neck T-Shirt", "Soft, breathable 100% cotton tee for everyday wear.");
+        // 同一款 T 恤的 4 个规格（同一款号），前台显示为一个商品，可选颜色和尺码
+        String[][] tees = {{"白色", "White", "M", "40"}, {"白色", "White", "L", "35"},
+                {"黑色", "Black", "M", "30"}, {"黑色", "Black", "L", "0"}};
+        for (int i = 0; i < tees.length; i++) {
+            String[] t = tees[i];
+            Product tee = product("纯棉圆领T恤 " + t[0] + " " + t[2] + "码", "DEMO-001-" + (i + 1), clothing, "59.00", "99.00",
+                    Integer.parseInt(t[3]), "100% 纯棉面料，柔软透气，四季百搭。",
+                    "Classic Cotton Crew Neck T-Shirt - " + t[1] + ", " + t[2],
+                    "Soft, breathable 100% cotton tee for everyday wear.");
+            tee.setParentSku("DEMO-TEE");
+            tee.setColor(t[1]);
+            tee.setSize(t[2]);
+            tee.setBrand("StormWear");
+            products.save(tee);
+        }
         product("休闲牛仔裤", "DEMO-002", clothing, "159.00", null, 60, "经典直筒版型，弹力舒适。",
                 "Relaxed Straight-Leg Jeans", "Classic straight fit with comfortable stretch denim.");
         product("陶瓷马克杯", "DEMO-003", home, "35.00", "45.00", 200, "高温烧制，容量 350ml，可微波炉加热。",
@@ -56,7 +69,7 @@ public class DemoDataInitializer implements ApplicationRunner {
         return categories.save(c);
     }
 
-    private void product(String name, String sku, Category category, String price, String originalPrice,
+    private Product product(String name, String sku, Category category, String price, String originalPrice,
                          int stock, String description, String titleEn, String descriptionEn) {
         Product p = new Product();
         p.setName(name);
@@ -69,6 +82,6 @@ public class DemoDataInitializer implements ApplicationRunner {
         p.setTitleEn(titleEn);
         p.setDescriptionEn(descriptionEn);
         p.setStatus(ProductStatus.ON_SALE);
-        products.save(p);
+        return products.save(p);
     }
 }

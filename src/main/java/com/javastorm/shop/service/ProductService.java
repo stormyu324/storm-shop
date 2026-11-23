@@ -6,7 +6,10 @@ import com.javastorm.shop.domain.ProductStatus;
 import com.javastorm.shop.repository.CategoryRepository;
 import com.javastorm.shop.repository.ProductRepository;
 import com.javastorm.shop.web.form.ProductForm;
+import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -51,9 +54,21 @@ public class ProductService {
         return products.findAll(spec(null, status, categoryId), org.springframework.data.domain.Sort.by("id"));
     }
 
+    /**
+     * 前台列表：同一款号的多个变体只显示一个（符合筛选条件的变体里 ID 最小的那个），
+     * 这样按某个变体的 SKU 搜索也能找到这个款式。
+     */
     @Transactional(readOnly = true)
     public Page<Product> searchStorefront(String keyword, Long categoryId, Pageable pageable) {
-        return search(keyword, ProductStatus.ON_SALE, categoryId, pageable);
+        Specification<Product> onePerFamily = (root, query, cb) -> {
+            Subquery<Long> firstVariant = query.subquery(Long.class);
+            Root<Product> sibling = firstVariant.from(Product.class);
+            List<Predicate> siblingFilters = filters(sibling, cb, keyword, ProductStatus.ON_SALE, categoryId);
+            siblingFilters.add(cb.equal(sibling.get("parentSku"), root.get("parentSku")));
+            firstVariant.select(cb.min(sibling.<Long>get("id"))).where(siblingFilters.toArray(Predicate[]::new));
+            return cb.or(cb.isNull(root.get("parentSku")), cb.equal(root.get("id"), firstVariant));
+        };
+        return products.findAll(spec(keyword, ProductStatus.ON_SALE, categoryId).and(onePerFamily), pageable);
     }
 
     @Transactional(readOnly = true)
@@ -192,21 +207,25 @@ public class ProductService {
     }
 
     private static Specification<Product> spec(String keyword, ProductStatus status, Long categoryId) {
-        return (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            if (StringUtils.hasText(keyword)) {
-                String like = "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";
-                predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("name")), like),
-                        cb.like(cb.lower(root.get("sku")), like)));
-            }
-            if (status != null) {
-                predicates.add(cb.equal(root.get("status"), status));
-            }
-            if (categoryId != null) {
-                predicates.add(cb.equal(root.<Category>get("category").get("id"), categoryId));
-            }
-            return cb.and(predicates.toArray(Predicate[]::new));
-        };
+        return (root, query, cb) -> cb.and(filters(root, cb, keyword, status, categoryId).toArray(Predicate[]::new));
+    }
+
+    private static List<Predicate> filters(Root<Product> root, CriteriaBuilder cb,
+                                           String keyword, ProductStatus status, Long categoryId) {
+        List<Predicate> predicates = new ArrayList<>();
+        if (StringUtils.hasText(keyword)) {
+            String like = "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";
+            predicates.add(cb.or(
+                    cb.like(cb.lower(root.get("name")), like),
+                    cb.like(cb.lower(cb.coalesce(root.get("titleEn"), "")), like),
+                    cb.like(cb.lower(root.get("sku")), like)));
+        }
+        if (status != null) {
+            predicates.add(cb.equal(root.get("status"), status));
+        }
+        if (categoryId != null) {
+            predicates.add(cb.equal(root.<Category>get("category").get("id"), categoryId));
+        }
+        return predicates;
     }
 }

@@ -24,12 +24,30 @@
                 <span class="price" th:text="${@pricing.formatPrice(product, currency)}">¥0.00</span>
                 <span class="orig" th:if="${product.hasDiscount()}" th:text="${@pricing.formatOriginalPrice(product, currency)}"></span>
             </div>
+            <div class="variant-picker" th:unless="${variants.empty}">
+                <div class="variant-row" th:unless="${variants.colors.empty}">
+                    <span class="variant-label"><th:block th:text="#{product.color} + (${en} ? ': ' : '：')">颜色：</th:block><b th:text="${product.color}"></b></span>
+                    <div class="variant-options">
+                        <a th:each="o : ${variants.colors}" th:href="@{/products/{id}(id=${o.targetId})}" th:text="${o.label}"
+                           class="variant-option" th:classappend="${(o.selected ? 'selected ' : '') + (o.available ? '' : 'unavailable')}"
+                           th:attr="aria-current=${o.selected} ? 'true' : null"></a>
+                    </div>
+                </div>
+                <div class="variant-row" th:unless="${variants.sizes.empty}">
+                    <span class="variant-label"><th:block th:text="#{product.size} + (${en} ? ': ' : '：')">尺码：</th:block><b th:text="${product.size}"></b></span>
+                    <div class="variant-options">
+                        <a th:each="o : ${variants.sizes}" th:href="@{/products/{id}(id=${o.targetId})}" th:text="${o.label}"
+                           class="variant-option" th:classappend="${(o.selected ? 'selected ' : '') + (o.available ? '' : 'unavailable')}"
+                           th:attr="aria-current=${o.selected} ? 'true' : null"></a>
+                    </div>
+                </div>
+            </div>
             <div class="spec">
                 <span><th:block th:text="#{product.stock}">库存</th:block> <b th:text="${product.stock > 0} ? ${product.stock} : #{product.soldOut}"></b></span>
                 <span><th:block th:text="#{product.sku}">编号</th:block> <b th:text="${product.sku}"></b></span>
                 <span th:if="${product.brand}"><th:block th:text="#{product.brand}">品牌</th:block> <b th:text="${product.brand}"></b></span>
-                <span th:if="${product.color}"><th:block th:text="#{product.color}">颜色</th:block> <b th:text="${product.color}"></b></span>
-                <span th:if="${product.size}"><th:block th:text="#{product.size}">尺码</th:block> <b th:text="${product.size}"></b></span>
+                <span th:if="${product.color != null and variants.colors.empty}"><th:block th:text="#{product.color}">颜色</th:block> <b th:text="${product.color}"></b></span>
+                <span th:if="${product.size != null and variants.sizes.empty}"><th:block th:text="#{product.size}">尺码</th:block> <b th:text="${product.size}"></b></span>
                 <span th:if="${product.material}"><th:block th:text="#{product.material}">材质</th:block> <b th:text="${product.material}"></b></span>
             </div>
             <form th:if="${product.stock > 0}" th:action="@{/cart/add}" method="post" class="actions">

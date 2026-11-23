@@ -43,18 +43,24 @@
             <div class="card center muted" th:if="${products.empty}" th:text="#{store.empty}">暂时没有商品</div>
 
             <div class="product-grid">
-                <a class="product-card" th:each="p : ${products}" th:href="@{/products/{id}(id=${p.id})}">
+                <a class="product-card" th:each="p : ${products}" th:href="@{/products/{id}(id=${p.id})}"
+                   th:with="f=${p.parentSku != null} ? ${families.get(p.parentSku)} : null">
                     <div class="thumb">
                         <span class="sale-tag" th:if="${p.hasDiscount()}" th:text="#{product.sale}">SALE</span>
                         <img th:src="${p.mainImage != null} ? ${p.mainImage} : @{/img/placeholder.svg}" th:alt="${p.title(en)}" loading="lazy">
                     </div>
                     <div class="info">
-                        <div class="name" th:text="${p.title(en)}">商品名称</div>
-                        <div>
+                        <div class="name" th:text="${f != null and f.title(en) != null} ? ${f.title(en)} : ${p.title(en)}">商品名称</div>
+                        <div th:if="${f != null and f.priceVaries}">
+                            <span class="price" th:text="#{product.priceFrom(${@pricing.format(f.minPrice, currency)})}">¥0.00 起</span>
+                        </div>
+                        <div th:unless="${f != null and f.priceVaries}">
                             <span class="price" th:text="${@pricing.formatPrice(p, currency)}">¥0.00</span>
                             <span class="orig" th:if="${p.hasDiscount()}" th:text="${@pricing.formatOriginalPrice(p, currency)}"></span>
                         </div>
-                        <div class="soldout" th:if="${p.stock <= 0}" th:text="#{product.soldOut}">已售罄</div>
+                        <div class="variant-count" th:if="${f != null and f.variantCount > 1}"
+                             th:text="#{product.variantCount(${f.variantCount})}">3 个规格</div>
+                        <div class="soldout" th:if="${f != null} ? ${!f.inStock} : ${p.stock <= 0}" th:text="#{product.soldOut}">已售罄</div>
                     </div>
                 </a>
             </div>

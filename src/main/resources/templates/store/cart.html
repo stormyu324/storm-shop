@@ -22,6 +22,11 @@
                             <img class="mini-thumb" th:src="${line.product.mainImage != null} ? ${line.product.mainImage} : @{/img/placeholder.svg}" alt="">
                             <div>
                                 <a th:href="@{/products/{id}(id=${line.product.id})}" th:text="${line.product.title(en)}"></a>
+                                <div class="muted variant-note" th:if="${line.product.color != null or line.product.size != null}">
+                                    <th:block th:if="${line.product.color}" th:text="#{product.color} + ': ' + ${line.product.color}"></th:block>
+                                    <th:block th:if="${line.product.color != null and line.product.size != null}"> · </th:block>
+                                    <th:block th:if="${line.product.size}" th:text="#{product.size} + ': ' + ${line.product.size}"></th:block>
+                                </div>
                                 <div class="low-stock" th:unless="${line.available}"
                                      th:text="${!line.product.onSale} ? #{cart.offShelf} : #{cart.lowStock(${line.product.stock})}"></div>
                             </div>
