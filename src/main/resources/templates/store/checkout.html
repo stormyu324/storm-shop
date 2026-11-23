@@ -43,8 +43,8 @@
             <label for="note" th:text="#{checkout.note}">备注（可选）</label>
             <input id="note" th:field="*{note}" maxlength="500">
         </div>
-        <p class="muted" th:text="#{checkout.noPayment}">本店暂未接入在线支付</p>
-        <button type="submit" th:text="#{checkout.submit}">提交订单</button>
+        <p class="muted" th:text="${onlinePayment} ? #{checkout.onlinePayment} : #{checkout.noPayment}">本店暂未接入在线支付</p>
+        <button type="submit" th:text="${onlinePayment} ? #{checkout.submitPay} : #{checkout.submit}">提交订单</button>
     </form>
 </main>
 <footer th:replace="~{fragments/layout :: footer}"></footer>

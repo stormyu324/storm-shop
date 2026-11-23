@@ -5,6 +5,7 @@
 <header th:replace="~{fragments/layout :: storeHeader}"></header>
 <main class="container">
     <h1 th:text="#{cart.title}">购物车</h1>
+    <div th:replace="~{fragments/layout :: flash}"></div>
     <div class="card center" th:if="${cart.empty}">
         <p class="muted" th:text="#{cart.empty}">购物车是空的</p>
         <a th:href="@{/}" class="btn" th:text="#{cart.shopNow}">去逛逛</a>

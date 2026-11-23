@@ -3,7 +3,9 @@ package com.javastorm.shop.domain;
 import java.util.List;
 
 public enum OrderStatus {
+    PENDING_PAYMENT("待付款"),
     PLACED("待处理"),
+    PAID("已付款"),
     SHIPPED("已发货"),
     COMPLETED("已完成"),
     CANCELLED("已取消");
@@ -19,12 +21,14 @@ public enum OrderStatus {
     }
 
     /**
-     * 允许改成的下一个状态：待处理 → 已发货 / 已取消；已发货 → 已完成 / 已取消（退货）；
-     * 已完成、已取消为最终状态。
+     * 后台可以手动改成的状态：
+     * 待处理（线下确认）/ 已付款 → 已发货 / 已取消；已发货 → 已完成 / 已取消（退货）；
+     * 待付款只能取消（付款成功由 Stripe 自动改为已付款）；已完成、已取消为最终状态。
      */
     public List<OrderStatus> getNextStatuses() {
         return switch (this) {
-            case PLACED -> List.of(SHIPPED, CANCELLED);
+            case PENDING_PAYMENT -> List.of(CANCELLED);
+            case PLACED, PAID -> List.of(SHIPPED, CANCELLED);
             case SHIPPED -> List.of(COMPLETED, CANCELLED);
             case COMPLETED, CANCELLED -> List.of();
         };
@@ -36,5 +40,10 @@ public enum OrderStatus {
 
     public boolean isFinal() {
         return getNextStatuses().isEmpty();
+    }
+
+    /** 需要商家处理（发货）的订单。 */
+    public static List<OrderStatus> toFulfil() {
+        return List.of(PLACED, PAID);
     }
 }

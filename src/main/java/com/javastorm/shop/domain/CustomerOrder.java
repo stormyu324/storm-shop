@@ -56,6 +56,16 @@ public class CustomerOrder {
     @JoinColumn(name = "order_id")
     private List<OrderItem> items = new ArrayList<>();
 
+    /** Stripe Checkout Session ID，线下确认的订单为空。 */
+    @Column(length = 255)
+    private String paymentSessionId;
+
+    private LocalDateTime paidAt;
+
+    /** 运费，按下单时的币种；老订单为空，视为 0。 */
+    @Column(precision = 12, scale = 2)
+    private BigDecimal shippingFee;
+
     private LocalDateTime createdAt;
 
     @PrePersist
@@ -134,6 +144,37 @@ public class CustomerOrder {
 
     public List<OrderItem> getItems() {
         return items;
+    }
+
+    public String getPaymentSessionId() {
+        return paymentSessionId;
+    }
+
+    public void setPaymentSessionId(String paymentSessionId) {
+        this.paymentSessionId = paymentSessionId;
+    }
+
+    public LocalDateTime getPaidAt() {
+        return paidAt;
+    }
+
+    public void setPaidAt(LocalDateTime paidAt) {
+        this.paidAt = paidAt;
+    }
+
+    public BigDecimal getShippingFee() {
+        return shippingFee == null ? BigDecimal.ZERO : shippingFee;
+    }
+
+    /** 商品金额（不含运费）。 */
+    public BigDecimal getItemsTotal() {
+        return total.subtract(getShippingFee());
+    }
+
+    /** 设置运费并计入订单总额；只能在下单时调用一次。 */
+    public void addShippingFee(BigDecimal fee) {
+        this.shippingFee = fee;
+        this.total = this.total.add(fee);
     }
 
     public LocalDateTime getCreatedAt() {

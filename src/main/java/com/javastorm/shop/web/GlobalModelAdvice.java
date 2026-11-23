@@ -2,6 +2,7 @@ package com.javastorm.shop.web;
 
 import com.javastorm.shop.config.LocaleConfig;
 import com.javastorm.shop.domain.Currency;
+import com.javastorm.shop.payment.StripePaymentService;
 import com.javastorm.shop.service.BusinessException;
 import com.javastorm.shop.service.Cart;
 import org.springframework.context.MessageSource;
@@ -18,10 +19,12 @@ public class GlobalModelAdvice {
 
     private final Cart cart;
     private final MessageSource messages;
+    private final StripePaymentService stripe;
 
-    public GlobalModelAdvice(Cart cart, MessageSource messages) {
+    public GlobalModelAdvice(Cart cart, MessageSource messages, StripePaymentService stripe) {
         this.cart = cart;
         this.messages = messages;
+        this.stripe = stripe;
     }
 
     @ModelAttribute("cartCount")
@@ -38,6 +41,12 @@ public class GlobalModelAdvice {
     @ModelAttribute("currency")
     public Currency currency() {
         return LocaleConfig.currentCurrency();
+    }
+
+    /** 当前币种是否走 Stripe 在线支付（结账页的提示和按钮文字用）。 */
+    @ModelAttribute("onlinePayment")
+    public boolean onlinePayment() {
+        return stripe.isEnabledFor(LocaleConfig.currentCurrency());
     }
 
     @ExceptionHandler(BusinessException.class)

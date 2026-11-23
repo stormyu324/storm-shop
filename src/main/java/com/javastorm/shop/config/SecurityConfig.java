@@ -26,6 +26,8 @@ public class SecurityConfig {
                         .requestMatchers("/admin/login").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().permitAll())
+                // Stripe 服务器的通知没有 CSRF token，靠签名校验
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/stripe/webhook"))
                 .formLogin(form -> form
                         .loginPage("/admin/login")
                         .defaultSuccessUrl("/admin", true)

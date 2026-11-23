@@ -27,7 +27,7 @@ public class AdminDashboardController {
         model.addAttribute("drafts", products.countByStatus(ProductStatus.DRAFT));
         model.addAttribute("offShelf", products.countByStatus(ProductStatus.OFF_SHELF));
         model.addAttribute("lowStock", products.countByStockLessThanEqualAndStatus(LOW_STOCK, ProductStatus.ON_SALE));
-        model.addAttribute("pendingOrders", orders.countByStatus(OrderStatus.PLACED));
+        model.addAttribute("pendingOrders", orders.countByStatusIn(OrderStatus.toFulfil()));
         model.addAttribute("lowStockThreshold", LOW_STOCK);
         return "admin/dashboard";
     }

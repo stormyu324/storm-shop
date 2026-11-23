@@ -1,7 +1,10 @@
 package com.javastorm.shop.web;
 
 import com.javastorm.shop.config.LocaleConfig;
+import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
+import com.javastorm.shop.payment.PaymentFlow;
+import com.javastorm.shop.payment.StripePaymentService;
 import com.javastorm.shop.domain.Product;
 import com.javastorm.shop.repository.ProductRepository;
 import com.javastorm.shop.service.BusinessException;
@@ -10,6 +13,8 @@ import com.javastorm.shop.service.CartView;
 import com.javastorm.shop.service.OrderService;
 import com.javastorm.shop.web.form.CheckoutForm;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpSession;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -20,7 +25,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @Controller
 public class CartController {
@@ -32,14 +39,21 @@ public class CartController {
     private final ProductRepository products;
     private final MessageSource messages;
     private final GlobalModelAdvice advice;
+    private final StripePaymentService stripe;
+    private final PaymentFlow paymentFlow;
+    private final String publicBaseUrl;
 
     public CartController(Cart cart, OrderService orderService, ProductRepository products,
-                          MessageSource messages, GlobalModelAdvice advice) {
+                          MessageSource messages, GlobalModelAdvice advice, StripePaymentService stripe,
+                          PaymentFlow paymentFlow, @Value("${shop.public-base-url:}") String publicBaseUrl) {
         this.cart = cart;
         this.orderService = orderService;
         this.products = products;
         this.messages = messages;
         this.advice = advice;
+        this.stripe = stripe;
+        this.paymentFlow = paymentFlow;
+        this.publicBaseUrl = publicBaseUrl;
     }
 
     @GetMapping("/cart")
@@ -91,7 +105,7 @@ public class CartController {
 
     @PostMapping("/checkout")
     public String placeOrder(@Valid @ModelAttribute("form") CheckoutForm form, BindingResult binding, Model model,
-                             RedirectAttributes flash) {
+                             RedirectAttributes flash, HttpSession httpSession) {
         CartView view = view();
         if (view.isEmpty()) {
             return "redirect:/cart";
@@ -101,7 +115,14 @@ public class CartController {
             return "store/checkout";
         }
         try {
-            CustomerOrder order = placeOrderWithRetry(form);
+            Currency currency = LocaleConfig.currentCurrency();
+            boolean online = stripe.isEnabledFor(currency);
+            CustomerOrder order = placeOrderWithRetry(form, currency, online);
+            if (online) {
+                String url = paymentFlow.startPayment(order, cart, baseUrl(), LocaleConfig.isEnglish());
+                httpSession.setAttribute(PaymentController.PENDING_ORDER, order.getOrderNo());
+                return "redirect:" + url;
+            }
             // 通过 flash 传递，避免任何人凭订单号查看他人的收货信息
             flash.addFlashAttribute("order", order);
             return "redirect:/order-success";
@@ -116,10 +137,10 @@ public class CartController {
      * 多人同时购买同一商品时，后提交的订单会遇到版本冲突。此时用最新库存重新下单：
      * 库存还够就成功，不够就得到“库存不足”的正常提示。
      */
-    private CustomerOrder placeOrderWithRetry(CheckoutForm form) {
+    private CustomerOrder placeOrderWithRetry(CheckoutForm form, Currency currency, boolean awaitingPayment) {
         for (int attempt = 1; ; attempt++) {
             try {
-                return orderService.placeOrder(cart, form, LocaleConfig.currentCurrency());
+                return orderService.placeOrder(cart, form, currency, awaitingPayment);
             } catch (ObjectOptimisticLockingFailureException e) {
                 if (attempt >= MAX_ORDER_ATTEMPTS) {
                     throw new BusinessException("error.order.busy", "下单人数较多，请稍后再试");
@@ -134,6 +155,15 @@ public class CartController {
             return "redirect:/";
         }
         return "store/order-success";
+    }
+
+    /** 拼 Stripe 返回地址用：优先用配置的对外网址（部署在反向代理后面时必需）。 */
+    private String baseUrl() {
+        if (StringUtils.hasText(publicBaseUrl)) {
+            String u = publicBaseUrl.trim();
+            return u.endsWith("/") ? u.substring(0, u.length() - 1) : u;
+        }
+        return ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString();
     }
 
     private CartView view() {

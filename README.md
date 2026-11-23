@@ -91,7 +91,26 @@ mvnw.cmd spring-boot:run
   - 订单状态：待处理 → 已发货 → 已完成；待处理或已发货（退货）可取消，取消时自动退回库存；已完成、已取消不能再改
 - 删除商品或从商品中移除图片时，不再被任何商品使用的上传图片会自动从 `./uploads` 删除
 
-> 目前没有接入在线支付，订单提交后由商家线下确认。英文前台的订单按美元记录，后台订单列表会显示币种。
+> 英文前台的订单按美元记录，后台订单列表会显示币种。配置 Stripe 后美元订单可以在线付款（见下文）；没配置时，订单提交后由商家线下确认。
+
+## 在线支付（Stripe）
+
+配置后，英文前台（美元）下单会跳转到 Stripe 的安全付款页，支持银行卡、Apple Pay / Google Pay 等方式（以 Stripe 账户开通的为准）：
+
+1. 注册 https://stripe.com ，在 Developers → API keys 复制 **Secret key**，设置为环境变量 `STRIPE_SECRET_KEY`。先用测试模式的 `sk_test_...` 试，测试卡号 `4242 4242 4242 4242`，有效期填任意未来日期。
+2. 在 Developers → Webhooks 添加端点 `https://你的域名/stripe/webhook`，勾选事件
+   `checkout.session.completed`、`checkout.session.expired`、`checkout.session.async_payment_succeeded`、`checkout.session.async_payment_failed`，
+   把生成的 **Signing secret**（`whsec_...`）设置为 `STRIPE_WEBHOOK_SECRET`。
+   本地测试可以用 Stripe CLI：`stripe listen --forward-to localhost:8080/stripe/webhook`，它会打印要用的 `whsec_...`。
+3. 部署在反向代理（Nginx 等）后面时设置 `PUBLIC_BASE_URL`，付款完成后才能正确跳回本站。
+
+订单流程：
+
+- 下单时库存先锁定，订单为“待付款”；付款成功后自动变为“已付款”，在后台“待发货订单”里处理。
+- 顾客在付款页点返回、30 分钟内未付款、或付款失败，订单自动取消、库存退回，商品放回购物车。即使 webhook 没配好，系统每 10 分钟也会向 Stripe 核对一次超时订单。
+- 已付款订单要退款时，请在 Stripe 后台操作，再在本站后台把订单改为“已取消”（库存会退回）。
+
+默认只有美元订单走 Stripe；如果你的 Stripe 账户支持人民币收款，可以设置 `STRIPE_CURRENCIES=USD,CNY`。
 
 ## 配置（环境变量）
 
@@ -104,6 +123,8 @@ mvnw.cmd spring-boot:run
 | `DEMO_DATA` | `true` | 空库时是否写入示例数据 |
 | `CNY_PER_USD` | `7.10` | 美元价格未填写时的换算汇率（1 美元 = 多少人民币） |
 | `PUBLIC_BASE_URL` | 空（使用当前访问地址） | 网站对外网址，导出平台表格时用于拼完整图片链接 |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | 空（不启用） | Stripe 在线支付的密钥和 webhook 签名密钥 |
+| `STRIPE_CURRENCIES` | `USD` | 哪些币种的订单走 Stripe 付款 |
 | `ANTHROPIC_API_KEY` | 空（不启用） | Claude API 密钥，启用 AI 生成英文资料 |
 | `AI_MODEL` | `claude-opus-5-5` | AI 生成使用的模型 |
 
