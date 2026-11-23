@@ -13,6 +13,11 @@
             <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg><span th:text="#{hero.chip2}">极速发货</span></span>
             <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span th:text="#{hero.chip3}">无忧售后</span></span>
         </div>
+        <a class="hero-action" href="#collection" th:text="${en} ? 'Explore the collection' : '探索精选好物'">探索精选好物</a>
+        <div class="hero-display" aria-hidden="true">
+            <div class="hero-tile main-tile"><img th:src="@{/img/demo/tee-white.svg}" alt=""></div>
+            <div class="hero-tile small-tile"><img th:src="@{/img/demo/earbuds.svg}" alt=""></div>
+        </div>
     </section>
     <section class="ai-shop card" th:if="${aiShopping and q == null and category == null and products.number == 0}"
              th:attr="data-ai-thinking=#{ai.thinking},data-ai-error=#{ai.error},data-ai-empty=#{ai.empty},data-ai-from=#{ai.from}">
@@ -33,7 +38,11 @@
         </div>
         <div class="ai-result" data-ai-result hidden></div>
     </section>
-    <div class="store-layout">
+    <div class="collection-heading">
+        <h2 th:text="${en} ? 'Everyday essentials' : '日常好物，恰到好处'">日常好物，恰到好处</h2>
+        <p th:text="${en} ? 'Apparel · Home · Electronics' : '舒适穿搭 · 质感家居 · 灵感数码'">舒适穿搭 · 质感家居 · 灵感数码</p>
+    </div>
+    <div class="store-layout" id="collection">
         <aside>
             <p class="side-title" th:text="#{store.categories}">Categories</p>
             <ul class="side-cats">
