@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import javax.imageio.ImageIO;
+import javax.imageio.stream.ImageInputStream;
 
 /** 把上传的商品图片保存到本地目录，并返回可访问的 URL（/uploads/products/xxx.jpg）。 */
 @Service
@@ -71,8 +73,8 @@ public class ImageStorageService {
             throw new BusinessException("图片超过 10MB 限制");
         }
         try (InputStream input = file.getInputStream();
-             javax.imageio.stream.ImageInputStream image = javax.imageio.ImageIO.createImageInputStream(input)) {
-            var readers = javax.imageio.ImageIO.getImageReaders(image);
+             ImageInputStream image = ImageIO.createImageInputStream(input)) {
+            var readers = ImageIO.getImageReaders(image);
             if (!readers.hasNext()) {
                 throw new BusinessException("图片内容无效或格式不受支持");
             }

@@ -24,36 +24,6 @@ public class CustomerOrder {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private Long couponId;
-    private String couponCode;
-    @Column(precision=12,scale=2) private BigDecimal discountAmount;
-    private Boolean couponReleased;
-    public Long getCouponId() { return couponId; }
-    public String getCouponCode() { return couponCode; }
-    public BigDecimal getDiscountAmount() { return discountAmount==null ? BigDecimal.ZERO : discountAmount; }
-    public boolean isCouponReleased() { return Boolean.TRUE.equals(couponReleased); }
-    public void setCouponReleased(boolean value) { couponReleased=value; }
-    public void applyDiscount(Long id,String code,BigDecimal amount) {
-        couponId=id;couponCode=code;discountAmount=amount;couponReleased=false;total=total.subtract(amount);
-    }
-
-    private String email;
-    public String getEmail() { return email; }
-    public void setEmail(String value) { this.email = value; }
-    private String carrier;
-    public String getCarrier() { return carrier; }
-    public void setCarrier(String value) { this.carrier = value; }
-    private String trackingNumber;
-    public String getTrackingNumber() { return trackingNumber; }
-    public void setTrackingNumber(String value) { this.trackingNumber = value; }
-    @Column(length = 1000)
-    private String trackingUrl;
-    public String getTrackingUrl() { return trackingUrl; }
-    public void setTrackingUrl(String value) { this.trackingUrl = value; }
-    private java.time.LocalDateTime shippedAt;
-    public java.time.LocalDateTime getShippedAt() { return shippedAt; }
-    public void setShippedAt(java.time.LocalDateTime value) { this.shippedAt = value; }
-
 
     @Column(nullable = false, unique = true, length = 32)
     private String orderNo;
@@ -101,6 +71,29 @@ public class CustomerOrder {
     private BigDecimal shippingFee;
 
     private LocalDateTime createdAt;
+
+    /** 顾客邮箱：接收订单通知、凭验证码查单；会员下单时为会员邮箱。 */
+    private String email;
+
+    /** 物流：承运商、运单号、查询链接（HTTPS）和首次发货时间。 */
+    private String carrier;
+
+    private String trackingNumber;
+
+    @Column(length = 1000)
+    private String trackingUrl;
+
+    private LocalDateTime shippedAt;
+
+    /** 使用的优惠券和优惠金额；订单取消或退款时归还优惠券的使用次数（couponReleased 防止重复归还）。 */
+    private Long couponId;
+
+    private String couponCode;
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal discountAmount;
+
+    private Boolean couponReleased;
 
     @PrePersist
     void onCreate() {
@@ -221,5 +214,74 @@ public class CustomerOrder {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getCarrier() {
+        return carrier;
+    }
+
+    public void setCarrier(String carrier) {
+        this.carrier = carrier;
+    }
+
+    public String getTrackingNumber() {
+        return trackingNumber;
+    }
+
+    public void setTrackingNumber(String trackingNumber) {
+        this.trackingNumber = trackingNumber;
+    }
+
+    public String getTrackingUrl() {
+        return trackingUrl;
+    }
+
+    public void setTrackingUrl(String trackingUrl) {
+        this.trackingUrl = trackingUrl;
+    }
+
+    public LocalDateTime getShippedAt() {
+        return shippedAt;
+    }
+
+    public void setShippedAt(LocalDateTime shippedAt) {
+        this.shippedAt = shippedAt;
+    }
+
+    public Long getCouponId() {
+        return couponId;
+    }
+
+    public String getCouponCode() {
+        return couponCode;
+    }
+
+    public BigDecimal getDiscountAmount() {
+        return discountAmount == null ? BigDecimal.ZERO : discountAmount;
+    }
+
+    public boolean isCouponReleased() {
+        return Boolean.TRUE.equals(couponReleased);
+    }
+
+    public void setCouponReleased(boolean couponReleased) {
+        this.couponReleased = couponReleased;
+    }
+
+    /** 下单时使用优惠券：记录优惠并从总额里减去。 */
+    public void applyDiscount(Long couponId, String couponCode, BigDecimal amount) {
+        this.couponId = couponId;
+        this.couponCode = couponCode;
+        this.discountAmount = amount;
+        this.couponReleased = false;
+        this.total = this.total.subtract(amount);
     }
 }

@@ -102,7 +102,8 @@ public final class AdminDtos {
             Currency currency, BigDecimal itemsTotal, BigDecimal shippingFee, BigDecimal total,
             String customerName, String phone, String country, String address, String note,
             List<OrderLine> items, LocalDateTime createdAt, LocalDateTime paidAt,
-            String email,String carrier,String trackingNumber,String trackingUrl,LocalDateTime shippedAt, BigDecimal discountAmount, String couponCode) {
+            String email, String carrier, String trackingNumber, String trackingUrl, LocalDateTime shippedAt,
+            BigDecimal discountAmount, String couponCode) {
     }
 
     public record StatusChange(@NotNull OrderStatus status) {

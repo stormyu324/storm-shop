@@ -5,6 +5,7 @@ import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.OrderItem;
 import com.javastorm.shop.domain.OrderStatus;
 import com.javastorm.shop.domain.Product;
+import com.javastorm.shop.repository.AfterSaleRepository;
 import com.javastorm.shop.repository.OrderRepository;
 import com.javastorm.shop.repository.ProductRepository;
 import com.javastorm.shop.web.form.CheckoutForm;
@@ -19,8 +20,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -39,11 +40,13 @@ public class OrderService {
     private final ShippingService shipping;
     private final OrderMailService mail;
     private final CouponService coupons;
-    private final com.javastorm.shop.repository.AfterSaleRepository afterSales;
+    private final AfterSaleRepository afterSales;
 
-    public OrderService(ProductRepository products, OrderRepository orders, Pricing pricing, ShippingService shipping, OrderMailService mail, com.javastorm.shop.repository.AfterSaleRepository afterSales, CouponService coupons) {
-        this.coupons=coupons;
-        this.afterSales=afterSales;
+    public OrderService(ProductRepository products, OrderRepository orders, Pricing pricing,
+                        ShippingService shipping, OrderMailService mail, AfterSaleRepository afterSales,
+                        CouponService coupons) {
+        this.coupons = coupons;
+        this.afterSales = afterSales;
         this.mail = mail;
         this.products = products;
         this.orders = orders;
@@ -131,12 +134,13 @@ public class OrderService {
         ShippingService.Quote quote = shipping.quote(currency, form.getCountry(), order.getTotal(), weight);
         if (!quote.deliverable()) {
             throw new BusinessException("error.shipping.unavailable", "抱歉，暂不配送到所选国家 / 地区",
-                    Countries.name(form.getCountry(), english ? java.util.Locale.ENGLISH : java.util.Locale.SIMPLIFIED_CHINESE));
+                    Countries.name(form.getCountry(), english ? Locale.ENGLISH : Locale.SIMPLIFIED_CHINESE));
         }
         order.addShippingFee(quote.fee());
-        coupons.reserve(order,form.getCouponCode());
-        if(order.getTotal().signum()==0) {
-            order.setStatus(OrderStatus.PAID);order.setPaidAt(LocalDateTime.now());
+        coupons.reserve(order, form.getCouponCode());
+        if (order.getTotal().signum() == 0) {
+            order.setStatus(OrderStatus.PAID);
+            order.setPaidAt(LocalDateTime.now());
         }
         CustomerOrder saved = orders.save(order);
         mail.order(saved, "PLACED", "订单已创建 / Your order was placed.");
@@ -220,7 +224,7 @@ public class OrderService {
     public void changeStatus(Long orderId, OrderStatus status) {
         CustomerOrder order = orders.findForUpdate(orderId).orElseThrow(() -> new BusinessException("订单不存在"));
         if (afterSales.findByOrderIdOrderByIdDesc(orderId).stream()
-                .anyMatch(a -> !"REJECTED".equals(a.state))) {
+                .anyMatch(a -> !"REJECTED".equals(a.getState()))) {
             throw new BusinessException("请先处理该订单的售后申请");
         }
         if (order.getStatus() == status) {
@@ -229,10 +233,10 @@ public class OrderService {
         if (!order.getStatus().canChangeTo(status)) {
             throw new BusinessException("订单「" + order.getStatus().getLabel() + "」不能改为「" + status.getLabel() + "」");
         }
-        if (status == OrderStatus.CANCELLED && order.getPaidAt()!=null) {
+        if (status == OrderStatus.CANCELLED && order.getPaidAt() != null) {
             throw new BusinessException("已付款订单请通过售后流程办理退款");
         }
-        if (status == OrderStatus.SHIPPED && order.getShippedAt()==null) {
+        if (status == OrderStatus.SHIPPED && order.getShippedAt() == null) {
             order.setShippedAt(LocalDateTime.now());
         }
         if (status == OrderStatus.CANCELLED) {

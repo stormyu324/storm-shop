@@ -1,9 +1,10 @@
 package com.javastorm.shop.repository;
 
 import com.javastorm.shop.domain.AfterSaleHistory;
-import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
+
 public interface AfterSaleHistoryRepository extends JpaRepository<AfterSaleHistory, Long> {
-  List<AfterSaleHistory> findByCaseIdOrderByIdAsc(Long caseId);
+    List<AfterSaleHistory> findByCaseIdOrderByIdAsc(Long caseId);
 }

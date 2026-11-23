@@ -11,6 +11,7 @@ import com.javastorm.shop.api.StoreDtos.VariantOption;
 import com.javastorm.shop.domain.Category;
 import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
+import com.javastorm.shop.domain.OrderStatus;
 import com.javastorm.shop.domain.Product;
 import com.javastorm.shop.service.Pricing;
 import com.javastorm.shop.service.VariantService;
@@ -73,10 +74,10 @@ public class ApiMapper {
     }
 
     /** 已付款的订单不能直接取消，要走售后退款（OrderService.changeStatus 也会拒绝），按钮就不显示“取消”。 */
-    static java.util.List<com.javastorm.shop.domain.OrderStatus> nextStatuses(CustomerOrder o) {
+    static List<OrderStatus> nextStatuses(CustomerOrder o) {
         var next = o.getStatus().getNextStatuses();
         return o.getPaidAt() == null ? next
-                : next.stream().filter(s -> s != com.javastorm.shop.domain.OrderStatus.CANCELLED).toList();
+                : next.stream().filter(s -> s != OrderStatus.CANCELLED).toList();
     }
 
     public AdminOrder adminOrder(CustomerOrder o) {

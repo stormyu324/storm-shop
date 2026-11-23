@@ -3,21 +3,24 @@ package com.javastorm.shop.web;
 import com.javastorm.shop.config.LocaleConfig;
 import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
+import com.javastorm.shop.domain.OrderStatus;
+import com.javastorm.shop.domain.Product;
 import com.javastorm.shop.payment.PaymentFlow;
 import com.javastorm.shop.payment.StripePaymentService;
-import com.javastorm.shop.domain.Product;
 import com.javastorm.shop.repository.ProductRepository;
 import com.javastorm.shop.service.BusinessException;
 import com.javastorm.shop.service.Cart;
 import com.javastorm.shop.service.CartView;
 import com.javastorm.shop.service.Countries;
+import com.javastorm.shop.service.CouponService;
+import com.javastorm.shop.service.MemberService;
 import com.javastorm.shop.service.OrderPlacer;
+import com.javastorm.shop.service.OrderService;
 import com.javastorm.shop.service.Pricing;
 import com.javastorm.shop.service.SiteUrls;
-import com.javastorm.shop.service.OrderService;
 import com.javastorm.shop.web.form.CheckoutForm;
-import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Controller;
@@ -28,12 +31,12 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 public class CartController {
@@ -51,14 +54,15 @@ public class CartController {
     private final OrderPlacer orderPlacer;
     private final HttpSession session;
     private final Pricing pricing;
-    private final com.javastorm.shop.service.CouponService coupons;
-    private final com.javastorm.shop.service.MemberService members;
+    private final CouponService coupons;
+    private final MemberService members;
 
     public CartController(Cart cart, OrderService orderService, ProductRepository products,
                           MessageSource messages, GlobalModelAdvice advice, StripePaymentService stripe,
                           PaymentFlow paymentFlow, SiteUrls siteUrls, OrderPlacer orderPlacer,
-                          HttpSession session, Pricing pricing, com.javastorm.shop.service.CouponService coupons, com.javastorm.shop.service.MemberService members) {
-        this.coupons=coupons;this.members=members;
+                          HttpSession session, Pricing pricing, CouponService coupons, MemberService members) {
+        this.coupons = coupons;
+        this.members = members;
         this.siteUrls = siteUrls;
         this.orderPlacer = orderPlacer;
         this.session = session;
@@ -116,8 +120,10 @@ public class CartController {
         }
         CheckoutForm form = new CheckoutForm();
         form.setCountry(shipCountry());
-        var member=members.current(session);
-        if(member!=null) form.setEmail(member.email);
+        var member = members.current(session);
+        if (member != null) {
+            form.setEmail(member.getEmail());
+        }
         model.addAttribute("cart", view);
         model.addAttribute("form", form);
         model.addAttribute("countries", Countries.list(LocaleContextHolder.getLocale()));
@@ -127,7 +133,7 @@ public class CartController {
     /** 结账页切换国家时重新计算运费（页面上用 JavaScript 调用）。 */
     @GetMapping("/checkout/shipping")
     @ResponseBody
-    public Map<String, Object> shippingFor(@RequestParam String country,@RequestParam(required=false) String couponCode) {
+    public Map<String, Object> shippingFor(@RequestParam String country, @RequestParam(required = false) String couponCode) {
         if (Countries.isValid(country)) {
             session.setAttribute(SHIP_COUNTRY, country.toUpperCase(Locale.ROOT));
         }
@@ -175,12 +181,14 @@ public class CartController {
             return "store/checkout";
         }
         try {
-            var member=members.current(httpSession);
-            if(member!=null) form.setEmail(member.email);
+            var member = members.current(httpSession);
+            if (member != null) {
+                form.setEmail(member.getEmail());
+            }
             Currency currency = LocaleConfig.currentCurrency();
             boolean online = stripe.isEnabledFor(currency);
             CustomerOrder order = orderPlacer.place(cart, form, currency, online);
-            if (online && order.getStatus()==com.javastorm.shop.domain.OrderStatus.PENDING_PAYMENT) {
+            if (online && order.getStatus() == OrderStatus.PENDING_PAYMENT) {
                 String url = paymentFlow.startPayment(order, cart, siteUrls.baseUrl(), LocaleConfig.isEnglish());
                 httpSession.setAttribute(PaymentController.PENDING_ORDER, order.getOrderNo());
                 return "redirect:" + url;

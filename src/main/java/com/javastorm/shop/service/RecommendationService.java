@@ -25,12 +25,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -98,7 +100,7 @@ public class RecommendationService {
     private final String model;
     private final ProductRepository products;
     private final Pricing pricing;
-    private final Map<String, CacheEntry> cache = java.util.Collections.synchronizedMap(
+    private final Map<String, CacheEntry> cache = Collections.synchronizedMap(
             new LinkedHashMap<>(64, 0.75f, true) {
                 @Override
                 protected boolean removeEldestEntry(Map.Entry<String, CacheEntry> eldest) {
@@ -133,7 +135,7 @@ public class RecommendationService {
      * @param query     顾客的需求，可以为空（只按 anchorId 做搭配推荐）
      * @param anchorId  顾客正在看的商品，推荐和它搭配的其他商品；可以为空
      */
-    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Result recommend(String query, Long anchorId, Currency currency, boolean english) {
         if (client == null) {
             throw new BusinessException("error.ai.disabled", "AI 导购暂未开启");

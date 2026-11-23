@@ -1,20 +1,26 @@
 package com.javastorm.shop.config;
 
+import com.javastorm.shop.repository.StaffRepository;
+import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+
+import java.io.IOException;
 
 /** 前台和后台页面所有人可访问；后台数据接口 /api/admin/** 需要管理员登录（登录接口见 AdminSessionApi）。 */
 @Configuration
@@ -31,15 +37,18 @@ public class SecurityConfig {
     SecurityFilterChain apiSecurityFilterChain(HttpSecurity http, StaffSessionFilter staffSessions) throws Exception {
         http
                 .securityMatcher("/api/**")
-                .addFilterBefore(staffSessions, org.springframework.security.web.authentication.AnonymousAuthenticationFilter.class)
+                .addFilterBefore(staffSessions, AnonymousAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/admin/session").permitAll()
-                        .requestMatchers("/api/admin/staff/**","/api/admin/audit/**","/api/admin/orders/*/after-sales/*").hasRole("ADMIN")
-                        .requestMatchers("/api/admin/orders/**").hasAnyRole("ADMIN","SUPPORT")
-                        .requestMatchers("/api/admin/coupons/**","/api/admin/analytics/**").hasAnyRole("ADMIN","OPERATIONS")
+                        .requestMatchers("/api/admin/staff/**", "/api/admin/audit/**",
+                                "/api/admin/orders/*/after-sales/*").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/orders/**").hasAnyRole("ADMIN", "SUPPORT")
+                        .requestMatchers("/api/admin/coupons/**", "/api/admin/analytics/**").hasAnyRole("ADMIN", "OPERATIONS")
                         // 商品管理：商品、图片上传、分类、运费、AI 英文资料、平台导出
-                        .requestMatchers("/api/admin/products/**","/api/admin/images","/api/admin/categories/**","/api/admin/shipping/**","/api/admin/ai/**","/api/admin/export/**").hasAnyRole("ADMIN","CATALOG")
-                        .requestMatchers("/api/admin/dashboard").hasAnyRole("ADMIN","STAFF")
+                        .requestMatchers("/api/admin/products/**", "/api/admin/images", "/api/admin/categories/**",
+                                "/api/admin/shipping/**", "/api/admin/ai/**", "/api/admin/export/**")
+                        .hasAnyRole("ADMIN", "CATALOG")
+                        .requestMatchers("/api/admin/dashboard").hasAnyRole("ADMIN", "STAFF")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().permitAll())
                 .csrf(csrf -> csrf
@@ -54,7 +63,7 @@ public class SecurityConfig {
         return http.build();
     }
 
-    private static void json(jakarta.servlet.http.HttpServletResponse res, int status, String message) throws java.io.IOException {
+    private static void json(HttpServletResponse res, int status, String message) throws IOException {
         res.setStatus(status);
         res.setContentType("application/json;charset=UTF-8");
         res.getWriter().write("{\"message\":\"" + message + "\"}");
@@ -82,18 +91,20 @@ public class SecurityConfig {
     UserDetailsService adminUsers(@Value("${shop.admin.username}") String username,
                                   @Value("${shop.admin.password}") String password,
                                   @Value("${shop.admin.require-strong-password:false}") boolean requireStrong,
-                                  PasswordEncoder encoder, com.javastorm.shop.repository.StaffRepository staff) {
+                                  PasswordEncoder encoder, StaffRepository staff) {
         checkPassword(password, requireStrong);
         InMemoryUserDetailsManager owner = new InMemoryUserDetailsManager(User.withUsername(username)
                 .password(encoder.encode(password))
                 .roles("ADMIN")
                 .build());
         return loginName -> {
-            if(owner.userExists(loginName)) return owner.loadUserByUsername(loginName);
-            var account=staff.findByUsername(loginName).orElseThrow(() ->
-                    new org.springframework.security.core.userdetails.UsernameNotFoundException("账号不存在"));
-            return User.withUsername(account.username).password(account.passwordHash)
-                    .roles("STAFF",account.role).disabled(!account.enabled).build();
+            if (owner.userExists(loginName)) {
+                return owner.loadUserByUsername(loginName);
+            }
+            var account = staff.findByUsername(loginName).orElseThrow(() ->
+                    new UsernameNotFoundException("账号不存在"));
+            return User.withUsername(account.getUsername()).password(account.getPasswordHash())
+                    .roles("STAFF", account.getRole()).disabled(!account.isEnabled()).build();
         };
     }
 

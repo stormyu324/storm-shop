@@ -3,6 +3,7 @@ package com.javastorm.shop.api.admin;
 import com.javastorm.shop.api.AdminDtos.LoginRequest;
 import com.javastorm.shop.api.AdminDtos.SessionInfo;
 import com.javastorm.shop.api.ApiError;
+import com.javastorm.shop.repository.StaffRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,6 +30,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+import java.util.Set;
+
 /** 后台登录状态（Cookie 会话）。 */
 @RestController
 @RequestMapping("/api/admin/session")
@@ -36,11 +40,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminSessionApi {
 
     private final AuthenticationProvider authProvider;
-    private final com.javastorm.shop.repository.StaffRepository staff;
+    private final StaffRepository staff;
     private final SecurityContextRepository contextRepository = new HttpSessionSecurityContextRepository();
 
-    public AdminSessionApi(UserDetailsService users, PasswordEncoder encoder, com.javastorm.shop.repository.StaffRepository staff) {
-        this.staff=staff;
+    public AdminSessionApi(UserDetailsService users, PasswordEncoder encoder, StaffRepository staff) {
+        this.staff = staff;
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(users);
         provider.setPasswordEncoder(encoder);
@@ -65,7 +69,7 @@ public class AdminSessionApi {
         }
         request.getSession(true);
         staff.findByUsername(auth.getName()).ifPresent(account ->
-                request.getSession().setAttribute("staffCredentialVersion",account.credentialVersion));
+                request.getSession().setAttribute("staffCredentialVersion", account.getCredentialVersion()));
         request.changeSessionId(); // 防止会话固定攻击
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(auth);
@@ -83,7 +87,11 @@ public class AdminSessionApi {
 
     private static SessionInfo info(Authentication auth, CsrfToken csrf) {
         boolean admin = auth != null && auth.isAuthenticated()
-                && auth.getAuthorities().stream().anyMatch(a -> java.util.Set.of("ROLE_ADMIN","ROLE_STAFF").contains(a.getAuthority()));
-        return new SessionInfo(admin, admin ? auth.getName() : null, csrf == null ? null : csrf.getToken(), admin ? auth.getAuthorities().stream().map(a -> a.getAuthority().replace("ROLE_","")).toList() : java.util.List.of());
+                && auth.getAuthorities().stream()
+                        .anyMatch(a -> Set.of("ROLE_ADMIN", "ROLE_STAFF").contains(a.getAuthority()));
+        List<String> roles = admin
+                ? auth.getAuthorities().stream().map(a -> a.getAuthority().replace("ROLE_", "")).toList()
+                : List.of();
+        return new SessionInfo(admin, admin ? auth.getName() : null, csrf == null ? null : csrf.getToken(), roles);
     }
 }

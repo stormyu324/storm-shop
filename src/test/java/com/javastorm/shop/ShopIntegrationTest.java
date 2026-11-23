@@ -1,7 +1,5 @@
 package com.javastorm.shop;
 
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import org.springframework.http.MediaType;
 import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.OrderStatus;
@@ -21,6 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,6 +40,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -73,7 +75,7 @@ class ShopIntegrationTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void createProductWithUploadedImageAndPublish() throws Exception {
-        MockMultipartFile image = new MockMultipartFile("files", "shirt.png", "image/png", java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII="));
+        MockMultipartFile image = new MockMultipartFile("files", "shirt.png", "image/png", Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII="));
         String uploaded = mvc.perform(multipart("/api/admin/images").file(image).with(csrf()))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         String url = uploaded.replaceAll(".*\\[\"([^\"]+)\"].*", "$1");
@@ -185,7 +187,7 @@ class ShopIntegrationTest {
     @Test
     void storefrontCheckoutFlow() throws Exception {
         Product p = product("WEB-1", 2, ProductStatus.ON_SALE);
-        var session = new org.springframework.mock.web.MockHttpSession();
+        var session = new MockHttpSession();
         mvc.perform(post("/cart/add").session(session).param("productId", p.getId().toString()).with(csrf()))
                 .andExpect(redirectedUrl("/products/" + p.getId()));
         mvc.perform(get("/cart").session(session)).andExpect(content().string(containsString("商品WEB-1")));

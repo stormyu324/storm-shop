@@ -3,6 +3,7 @@ package com.javastorm.shop.api;
 import com.javastorm.shop.domain.Currency;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
@@ -51,7 +52,7 @@ public final class StoreDtos {
     public record QuoteRequest(
             @Schema(description = "不传时按语言：中文 CNY，英文 USD") Currency currency,
             @Schema(description = "寄往国家，ISO 两位代码，如 US", example = "US") String country,
-            @NotEmpty @Size(max = 50) List<@Valid CartItem> items, @Size(max=40) String couponCode) {
+            @NotEmpty @Size(max = 50) List<@Valid CartItem> items, @Size(max = 40) String couponCode) {
     }
 
     public record QuoteLine(Long productId, String title, int quantity, BigDecimal unitPrice, BigDecimal subtotal,
@@ -61,19 +62,22 @@ public final class StoreDtos {
     public record Quote(List<QuoteLine> lines, BigDecimal subtotal, BigDecimal shipping, BigDecimal total,
                         Currency currency, String country,
                         @Schema(description = "false 表示不配送到这个国家") boolean deliverable,
-                        @Schema(description = "还差多少可以包邮，没有包邮门槛或已包邮时为 null") BigDecimal freeShippingRemaining, BigDecimal discountAmount) {
+                        @Schema(description = "还差多少可以包邮，没有包邮门槛或已包邮时为 null") BigDecimal freeShippingRemaining,
+                        BigDecimal discountAmount) {
     }
 
     public record OrderRequest(
             Currency currency,
             @NotNull String customerName, @NotNull String phone, @NotNull String address, String note,
             @NotNull @Schema(example = "US") String country,
-            @NotEmpty @Size(max = 50) List<@Valid CartItem> items, @jakarta.validation.constraints.Email @Size(max = 254) String email, @Size(max=40) String couponCode) {
+            @NotEmpty @Size(max = 50) List<@Valid CartItem> items,
+            @Email @Size(max = 254) String email, @Size(max = 40) String couponCode) {
     }
 
     public record OrderCreated(
             String orderNo, String status, Currency currency,
             BigDecimal itemsTotal, BigDecimal shippingFee, BigDecimal total,
-            @Schema(description = "在线支付时跳转到这个 Stripe 付款页；线下确认的订单为 null") String paymentUrl, BigDecimal discountAmount, String couponCode) {
+            @Schema(description = "在线支付时跳转到这个 Stripe 付款页；线下确认的订单为 null") String paymentUrl,
+            BigDecimal discountAmount, String couponCode) {
     }
 }

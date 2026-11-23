@@ -7,6 +7,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -25,7 +26,7 @@ class OrderSubmissionGuardTest {
         var guard = new OrderSubmissionGuard();
         var calls = new AtomicInteger();
         try (var executor = Executors.newFixedThreadPool(8)) {
-            var futures = new java.util.ArrayList<Future<Integer>>();
+            var futures = new ArrayList<Future<Integer>>();
             for (int i = 0; i < 20; i++) {
                 futures.add(executor.submit(() -> guard.submit("client", "ip", "request", "body", TTL, calls::incrementAndGet)));
             }

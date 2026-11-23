@@ -10,8 +10,11 @@ import com.stripe.StripeClient;
 import com.stripe.exception.InvalidRequestException;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.exception.StripeException;
+import com.stripe.model.Refund;
 import com.stripe.model.checkout.Session;
+import com.stripe.net.RequestOptions;
 import com.stripe.net.Webhook;
+import com.stripe.param.RefundCreateParams;
 import com.stripe.param.checkout.SessionCreateParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,7 +92,7 @@ public class StripePaymentService {
     public RefundState refund(CustomerOrder order, String requestId, String refundId) {
         requireEnabled();
         try {
-            com.stripe.model.Refund refund;
+            Refund refund;
             if (refundId != null) {
                 refund = client.v1().refunds().retrieve(refundId);
             } else {
@@ -98,10 +101,11 @@ public class StripePaymentService {
                         || !"paid".equals(session.getPaymentStatus()) || session.getPaymentIntent() == null) {
                     throw new BusinessException("支付信息与订单不一致，请核查");
                 }
-                var params = com.stripe.param.RefundCreateParams.builder()
+                var params = RefundCreateParams.builder()
                         .setPaymentIntent(session.getPaymentIntent()).setAmount(toMinorUnits(order.getTotal()))
                         .putMetadata("after_sale_id", requestId).build();
-                var options = com.stripe.net.RequestOptions.builder().setIdempotencyKey("storm-refund-" + order.getOrderNo() + "-" + requestId).build();
+                var options = RequestOptions.builder()
+                        .setIdempotencyKey("storm-refund-" + order.getOrderNo() + "-" + requestId).build();
                 refund = client.v1().refunds().create(params, options);
             }
             return new RefundState(refund.getId(), refund.getStatus());
@@ -125,9 +129,11 @@ public class StripePaymentService {
                 .setCancelUrl(baseUrl + "/checkout/cancel")
                 .setExpiresAt(Instant.now().plus(SESSION_TTL).plusSeconds(60).getEpochSecond())
                 .setLocale(english ? SessionCreateParams.Locale.EN : SessionCreateParams.Locale.AUTO);
-        if (order.getDiscountAmount().signum()>0) {
-            BigDecimal discountedItems=order.getItemsTotal().subtract(order.getDiscountAmount());
-            if(discountedItems.signum()>0) params.addLineItem(lineItem(english ? "Discounted items" : "优惠后商品",discountedItems,1,currency));
+        if (order.getDiscountAmount().signum() > 0) {
+            BigDecimal discountedItems = order.getItemsTotal().subtract(order.getDiscountAmount());
+            if (discountedItems.signum() > 0) {
+                params.addLineItem(lineItem(english ? "Discounted items" : "优惠后商品", discountedItems, 1, currency));
+            }
         } else for (OrderItem item : order.getItems()) {
             params.addLineItem(lineItem(item.getProductName() + (item.getSku() == null ? "" : " (" + item.getSku() + ")"),
                     item.getUnitPrice(), item.getQuantity(), currency));

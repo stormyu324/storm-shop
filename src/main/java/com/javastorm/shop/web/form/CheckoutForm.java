@@ -1,19 +1,22 @@
 package com.javastorm.shop.web.form;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+
+import java.util.Locale;
 
 public class CheckoutForm {
 
     @NotBlank(message = "{checkout.name.required}")
     @Size(max = 50)
     private String customerName;
-    @jakarta.validation.constraints.Email
+    @Email
     @Size(max = 254)
     private String email;
     public String getEmail() { return email; }
-    public void setEmail(String value) { email = value == null || value.isBlank() ? null : value.trim().toLowerCase(java.util.Locale.ROOT); }
+    public void setEmail(String value) { email = value == null || value.isBlank() ? null : value.trim().toLowerCase(Locale.ROOT); }
 
 
     @NotBlank(message = "{checkout.phone.required}")
@@ -26,10 +29,10 @@ public class CheckoutForm {
 
     @Size(max = 500)
     private String note;
-    @Size(max=40) private String couponCode;
-    public String getCouponCode() { return couponCode; }
-    public void setCouponCode(String value) { couponCode=value; }
 
+    /** 优惠码，可不填。 */
+    @Size(max = 40)
+    private String couponCode;
 
     /** 寄往国家 / 地区，ISO 两位代码。 */
     @NotBlank(message = "{checkout.country.required}")
@@ -41,7 +44,7 @@ public class CheckoutForm {
     }
 
     public void setCountry(String country) {
-        this.country = country == null ? null : country.trim().toUpperCase(java.util.Locale.ROOT);
+        this.country = country == null ? null : country.trim().toUpperCase(Locale.ROOT);
     }
 
     public String getCustomerName() {
@@ -74,5 +77,13 @@ public class CheckoutForm {
 
     public void setNote(String note) {
         this.note = note;
+    }
+
+    public String getCouponCode() {
+        return couponCode;
+    }
+
+    public void setCouponCode(String couponCode) {
+        this.couponCode = couponCode;
     }
 }

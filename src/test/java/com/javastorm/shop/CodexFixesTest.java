@@ -184,8 +184,8 @@ class CodexFixesTest {
         cart.add(p.getId(), 1);
         orderService.placeOrder(cart, form("buyer@example.com"), Currency.CNY);
         assertThat(mails.findAll()).singleElement().satisfies(m -> {
-            assertThat(m.recipient).isEqualTo("buyer@example.com");
-            assertThat(m.expiresAt).isBetween(LocalDateTime.now().plusDays(2), LocalDateTime.now().plusDays(4));
+            assertThat(m.getRecipient()).isEqualTo("buyer@example.com");
+            assertThat(m.getExpiresAt()).isBetween(LocalDateTime.now().plusDays(2), LocalDateTime.now().plusDays(4));
         });
     }
 }

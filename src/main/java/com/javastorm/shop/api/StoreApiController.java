@@ -14,6 +14,7 @@ import com.javastorm.shop.api.StoreDtos.QuoteRequest;
 import com.javastorm.shop.config.LocaleConfig;
 import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
+import com.javastorm.shop.domain.OrderStatus;
 import com.javastorm.shop.domain.Product;
 import com.javastorm.shop.payment.PaymentFlow;
 import com.javastorm.shop.payment.StripePaymentService;
@@ -22,8 +23,11 @@ import com.javastorm.shop.repository.ProductRepository;
 import com.javastorm.shop.service.Cart;
 import com.javastorm.shop.service.CartView;
 import com.javastorm.shop.service.Countries;
+import com.javastorm.shop.service.CouponService;
+import com.javastorm.shop.service.MemberService;
 import com.javastorm.shop.service.OrderPlacer;
 import com.javastorm.shop.service.OrderService;
+import com.javastorm.shop.service.OrderSubmissionGuard;
 import com.javastorm.shop.service.ProductService;
 import com.javastorm.shop.service.SiteUrls;
 import com.javastorm.shop.service.VariantService;
@@ -31,6 +35,8 @@ import com.javastorm.shop.web.form.CheckoutForm;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
@@ -39,15 +45,21 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,15 +81,15 @@ public class StoreApiController {
     private final SiteUrls siteUrls;
     private final ApiMapper mapper;
     private final Validator validator;
-    private final com.javastorm.shop.service.CouponService coupons;
-    private final com.javastorm.shop.service.MemberService members;
-    private final com.javastorm.shop.service.OrderSubmissionGuard submissions;
+    private final CouponService coupons;
+    private final MemberService members;
+    private final OrderSubmissionGuard submissions;
 
     public StoreApiController(ProductService productService, ProductRepository products, CategoryRepository categories,
                               VariantService variantService, OrderService orderService, OrderPlacer orderPlacer,
                               StripePaymentService stripe, PaymentFlow paymentFlow, SiteUrls siteUrls,
-                              ApiMapper mapper, Validator validator, com.javastorm.shop.service.OrderSubmissionGuard submissions,
-            com.javastorm.shop.service.CouponService coupons,com.javastorm.shop.service.MemberService members) {
+                              ApiMapper mapper, Validator validator, OrderSubmissionGuard submissions,
+            CouponService coupons, MemberService members) {
         this.coupons = coupons;
         this.members = members;
         this.submissions = submissions;
@@ -153,9 +165,11 @@ public class StoreApiController {
         }
         CartView view = orderService.view(cartOf(req.items()), cur, country);
         boolean en = LocaleConfig.isEnglish();
+        BigDecimal discount = coupons.preview(req.couponCode(), view.subtotal(), cur);
         return new Quote(view.lines().stream().map(l -> new QuoteLine(l.product().getId(), l.product().title(en),
                         l.quantity(), l.unitPrice(), l.getSubtotal(), l.isAvailable())).toList(),
-                view.subtotal(), view.shipping(), view.total().subtract(coupons.preview(req.couponCode(),view.subtotal(),cur)), cur, country, view.deliverable(), view.freeRemaining(), coupons.preview(req.couponCode(),view.subtotal(),cur));
+                view.subtotal(), view.shipping(), view.total().subtract(discount), cur, country,
+                view.deliverable(), view.freeRemaining(), discount);
     }
 
     @PostMapping("/orders")
@@ -163,26 +177,26 @@ public class StoreApiController {
     @Operation(summary = "下单", description = "扣减库存并创建订单。该币种开通了 Stripe 时订单为“待付款”，"
             + "返回 paymentUrl，把顾客跳转过去付款；30 分钟内未付款自动取消。")
     public OrderCreated placeOrder(@Valid @RequestBody OrderRequest req,
-            @org.springframework.web.bind.annotation.RequestHeader(value = "Idempotency-Key", required = false) String key,
-            jakarta.servlet.http.HttpServletRequest http) {
+            @RequestHeader(value = "Idempotency-Key", required = false) String key,
+            HttpServletRequest http) {
         if (key != null && (key.isBlank() || key.length() > 128)) {
-            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST, "下单标识长度必须为 1 至 128");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "下单标识长度必须为 1 至 128");
         }
         Currency cur = currency(req.currency());
-        String fingerprint = org.springframework.util.DigestUtils.md5DigestAsHex(
-                (req.toString() + cur.name()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String fingerprint = DigestUtils.md5DigestAsHex(
+                (req.toString() + cur.name()).getBytes(StandardCharsets.UTF_8));
         // 顾客标识：有会话用会话；没有会话（App 等不带 Cookie 的调用方）时只有显式传了 Idempotency-Key 才去重，
         // 不为每个请求新建会话
-        jakarta.servlet.http.HttpSession existing = http.getSession(false);
+        HttpSession existing = http.getSession(false);
         String clientId = existing != null ? "session:" + existing.getId()
                 : key != null ? "ip:" + http.getRemoteAddr() : null;
         String requestKey = key == null ? "auto:" + fingerprint : "key:" + key;
-        java.time.Duration ttl = key == null ? com.javastorm.shop.service.OrderSubmissionGuard.AUTO_TTL
-                : com.javastorm.shop.service.OrderSubmissionGuard.KEY_TTL;
-        return submissions.submit(clientId, http.getRemoteAddr(), requestKey, fingerprint, ttl, () -> createOrder(req, cur, existing));
+        Duration ttl = key == null ? OrderSubmissionGuard.AUTO_TTL : OrderSubmissionGuard.KEY_TTL;
+        return submissions.submit(clientId, http.getRemoteAddr(), requestKey, fingerprint, ttl,
+                () -> createOrder(req, cur, existing));
     }
 
-    private OrderCreated createOrder(OrderRequest req, Currency cur, jakarta.servlet.http.HttpSession session) {
+    private OrderCreated createOrder(OrderRequest req, Currency cur, HttpSession session) {
         CheckoutForm form = new CheckoutForm();
         form.setCustomerName(req.customerName());
         form.setPhone(req.phone());
@@ -190,7 +204,9 @@ public class StoreApiController {
         form.setNote(req.note());
         form.setEmail(req.email());
         var member = members.current(session); // 已登录会员下单时，订单邮箱固定为会员邮箱
-        if(member!=null) form.setEmail(member.email);
+        if (member != null) {
+            form.setEmail(member.getEmail());
+        }
         form.setCouponCode(req.couponCode());
         form.setCountry(req.country());
         Map<String, String> errors = new LinkedHashMap<>();
@@ -205,7 +221,7 @@ public class StoreApiController {
         }
         boolean online = stripe.isEnabledFor(cur);
         CustomerOrder order = orderPlacer.place(cartOf(req.items()), form, cur, online);
-        String paymentUrl = online && order.getStatus()==com.javastorm.shop.domain.OrderStatus.PENDING_PAYMENT
+        String paymentUrl = online && order.getStatus() == OrderStatus.PENDING_PAYMENT
                 ? paymentFlow.startPayment(order, null, siteUrls.baseUrl(), cur == Currency.USD)
                 : null;
         return new OrderCreated(order.getOrderNo(), order.getStatus().name(), order.getCurrency(),

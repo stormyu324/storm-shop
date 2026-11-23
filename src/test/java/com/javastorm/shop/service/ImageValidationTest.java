@@ -3,8 +3,12 @@ package com.javastorm.shop.service;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.web.MockMultipartFile;
+
+import java.nio.file.Files;
 import java.nio.file.Path;
-import static org.assertj.core.api.Assertions.*;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ImageValidationTest {
     @TempDir Path directory;
@@ -13,7 +17,7 @@ class ImageValidationTest {
         var storage = new ImageStorageService(directory.toString());
         var file = new MockMultipartFile("files", "fake.png", "image/png", new byte[]{1, 2, 3});
         assertThatThrownBy(() -> storage.store(file)).isInstanceOf(BusinessException.class);
-        try (var files = java.nio.file.Files.list(directory)) {
+        try (var files = Files.list(directory)) {
             assertThat(files.count()).isZero();
         }
     }
