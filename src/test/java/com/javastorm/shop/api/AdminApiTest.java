@@ -76,7 +76,7 @@ class AdminApiTest {
     @WithMockUser(roles = "ADMIN")
     void productLifecycle() throws Exception {
         MvcResult uploaded = mvc.perform(multipart("/api/admin/images").file(
-                        new MockMultipartFile("files", "a.png", "image/png", new byte[]{1, 2, 3})).with(csrf()))
+                        new MockMultipartFile("files", "a.png", "image/png", java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII="))).with(csrf()))
                 .andExpect(status().isOk()).andReturn();
         String imageUrl = JSON.readTree(uploaded.getResponse().getContentAsString()).path("urls").get(0).asText();
 

@@ -15,6 +15,14 @@ public interface OrderRepository extends JpaRepository<CustomerOrder, Long> {
 
     Optional<CustomerOrder> findByOrderNo(String orderNo);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select o from CustomerOrder o where o.orderNo = :number")
+    Optional<CustomerOrder> findForUpdate(@org.springframework.data.repository.query.Param("number") String number);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select o from CustomerOrder o where o.id = :id")
+    Optional<CustomerOrder> findForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
+
     boolean existsByOrderNo(String orderNo);
 
     Page<CustomerOrder> findByStatus(OrderStatus status, Pageable pageable);

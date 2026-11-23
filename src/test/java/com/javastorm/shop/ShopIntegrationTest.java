@@ -73,7 +73,7 @@ class ShopIntegrationTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void createProductWithUploadedImageAndPublish() throws Exception {
-        MockMultipartFile image = new MockMultipartFile("files", "shirt.png", "image/png", new byte[]{1, 2, 3});
+        MockMultipartFile image = new MockMultipartFile("files", "shirt.png", "image/png", java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII="));
         String uploaded = mvc.perform(multipart("/api/admin/images").file(image).with(csrf()))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         String url = uploaded.replaceAll(".*\\[\"([^\"]+)\"].*", "$1");

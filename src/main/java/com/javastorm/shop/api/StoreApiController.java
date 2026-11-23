@@ -69,11 +69,13 @@ public class StoreApiController {
     private final SiteUrls siteUrls;
     private final ApiMapper mapper;
     private final Validator validator;
+    private final com.javastorm.shop.service.OrderSubmissionGuard submissions;
 
     public StoreApiController(ProductService productService, ProductRepository products, CategoryRepository categories,
                               VariantService variantService, OrderService orderService, OrderPlacer orderPlacer,
                               StripePaymentService stripe, PaymentFlow paymentFlow, SiteUrls siteUrls,
-                              ApiMapper mapper, Validator validator) {
+                              ApiMapper mapper, Validator validator, com.javastorm.shop.service.OrderSubmissionGuard submissions) {
+        this.submissions = submissions;
         this.productService = productService;
         this.products = products;
         this.categories = categories;
@@ -155,7 +157,20 @@ public class StoreApiController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "下单", description = "扣减库存并创建订单。该币种开通了 Stripe 时订单为“待付款”，"
             + "返回 paymentUrl，把顾客跳转过去付款；30 分钟内未付款自动取消。")
-    public OrderCreated placeOrder(@Valid @RequestBody OrderRequest req) {
+    public OrderCreated placeOrder(@Valid @RequestBody OrderRequest req,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "Idempotency-Key", required = false) String key,
+            jakarta.servlet.http.HttpServletRequest http) {
+        if (key != null && (key.isBlank() || key.length() > 128)) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST, "下单标识长度必须为 1 至 128");
+        }
+        Currency cur = currency(req.currency());
+        String fingerprint = org.springframework.util.DigestUtils.md5DigestAsHex(
+                (req.toString() + cur.name()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String requestKey = key == null ? "auto:" + fingerprint : "key:" + key;
+        return submissions.submit(http.getSession().getId(), http.getRemoteAddr(), requestKey, fingerprint, () -> createOrder(req, cur));
+    }
+
+    private OrderCreated createOrder(OrderRequest req, Currency cur) {
         CheckoutForm form = new CheckoutForm();
         form.setCustomerName(req.customerName());
         form.setPhone(req.phone());
@@ -172,7 +187,6 @@ public class StoreApiController {
         if (!errors.isEmpty()) {
             throw new ApiValidationException(errors);
         }
-        Currency cur = currency(req.currency());
         boolean online = stripe.isEnabledFor(cur);
         CustomerOrder order = orderPlacer.place(cartOf(req.items()), form, cur, online);
         String paymentUrl = online

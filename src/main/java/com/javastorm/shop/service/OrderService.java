@@ -159,7 +159,7 @@ public class OrderService {
      */
     @Transactional
     public Optional<CustomerOrder> markPaid(String orderNo, String sessionId) {
-        Optional<CustomerOrder> found = orders.findByOrderNo(orderNo);
+        Optional<CustomerOrder> found = orders.findForUpdate(orderNo);
         found.ifPresent(order -> {
             if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
                 order.setStatus(OrderStatus.PAID);
@@ -175,7 +175,7 @@ public class OrderService {
     /** 取消未付款的订单并退回库存；返回订单里的商品，方便放回购物车。不是待付款状态时什么也不做。 */
     @Transactional
     public Map<Long, Integer> cancelUnpaid(String orderNo) {
-        CustomerOrder order = orders.findByOrderNo(orderNo).orElse(null);
+        CustomerOrder order = orders.findForUpdate(orderNo).orElse(null);
         if (order == null || order.getStatus() != OrderStatus.PENDING_PAYMENT) {
             return Map.of();
         }
@@ -203,7 +203,7 @@ public class OrderService {
     /** 修改订单状态；取消订单时把库存加回去。 */
     @Transactional
     public void changeStatus(Long orderId, OrderStatus status) {
-        CustomerOrder order = orders.findById(orderId).orElseThrow(() -> new BusinessException("订单不存在"));
+        CustomerOrder order = orders.findForUpdate(orderId).orElseThrow(() -> new BusinessException("订单不存在"));
         if (order.getStatus() == status) {
             return;
         }

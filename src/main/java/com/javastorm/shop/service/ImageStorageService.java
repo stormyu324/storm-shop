@@ -66,6 +66,35 @@ public class ImageStorageService {
         }
     }
 
+    private void validateImage(MultipartFile file) {
+        if (file.getSize() > 10L * 1024 * 1024) {
+            throw new BusinessException("图片超过 10MB 限制");
+        }
+        try (InputStream input = file.getInputStream();
+             javax.imageio.stream.ImageInputStream image = javax.imageio.ImageIO.createImageInputStream(input)) {
+            var readers = javax.imageio.ImageIO.getImageReaders(image);
+            if (!readers.hasNext()) {
+                throw new BusinessException("图片内容无效或格式不受支持");
+            }
+            var reader = readers.next();
+            try {
+                reader.setInput(image);
+                int width = reader.getWidth(0);
+                int height = reader.getHeight(0);
+                if (width <= 0 || height <= 0 || (long) width * height > 20_000_000L) {
+                    throw new BusinessException("图片尺寸超过 2000 万像素限制");
+                }
+                if (reader.read(0) == null) {
+                    throw new BusinessException("图片内容无效");
+                }
+            } finally {
+                reader.dispose();
+            }
+        } catch (IOException | IllegalArgumentException e) {
+            throw new BusinessException("图片内容无效或已损坏");
+        }
+    }
+
     public String store(MultipartFile file) {
         String ext = StringUtils.getFilenameExtension(file.getOriginalFilename());
         ext = ext == null ? "" : ext.toLowerCase(Locale.ROOT);
@@ -76,6 +105,7 @@ public class ImageStorageService {
         if (contentType != null && !contentType.startsWith("image/")) {
             throw new BusinessException("文件不是图片：" + file.getOriginalFilename());
         }
+        validateImage(file);
         String filename = UUID.randomUUID().toString().replace("-", "") + "." + ext;
         Path dir = root.resolve("products");
         try (InputStream in = file.getInputStream()) {

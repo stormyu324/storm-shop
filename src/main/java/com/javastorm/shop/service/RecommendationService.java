@@ -133,7 +133,7 @@ public class RecommendationService {
      * @param query     顾客的需求，可以为空（只按 anchorId 做搭配推荐）
      * @param anchorId  顾客正在看的商品，推荐和它搭配的其他商品；可以为空
      */
-    @Transactional(readOnly = true)
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public Result recommend(String query, Long anchorId, Currency currency, boolean english) {
         if (client == null) {
             throw new BusinessException("error.ai.disabled", "AI 导购暂未开启");
@@ -171,7 +171,8 @@ public class RecommendationService {
             if (p == null || excluded.contains(p.getId()) || !seen.add(p.getId()) || picks.size() >= MAX_PICKS) {
                 continue; // 不在目录里的 ID（模型编造的）直接丢掉
             }
-            picks.add(new Pick(p, pick.reason() == null ? "" : pick.reason().strip()));
+            products.findById(p.getId()).filter(Product::isOnSale).ifPresent(current ->
+                    picks.add(new Pick(current, pick.reason() == null ? "" : pick.reason().strip())));
         }
         String reply = answer.reply() == null ? "" : answer.reply().strip();
         cache.put(key, new CacheEntry(Instant.now(), reply,
