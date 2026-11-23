@@ -39,6 +39,8 @@ public class StoreController {
                         @RequestParam(defaultValue = "new") String sort,
                         @RequestParam(defaultValue = "0") int page,
                         Model model) {
+        // 搜索框空着点“搜索”时 q 是空字符串：按没有搜索处理
+        q = q == null || q.isBlank() ? null : q.trim();
         Sort order = switch (sort) {
             case "price_asc" -> Sort.by("price").ascending();
             case "price_desc" -> Sort.by("price").descending();

@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
 
 /** 首次启动（数据库为空）时写入几条示例数据，方便直接看到效果。可用 shop.demo-data=false 关闭。 */
 @Component
@@ -30,6 +32,7 @@ public class DemoDataInitializer implements ApplicationRunner {
     @Transactional
     public void run(ApplicationArguments args) {
         if (categories.count() > 0 || products.count() > 0) {
+            addMissingDemoImages();
             return;
         }
         Category clothing = category("服装", "Apparel");
@@ -48,6 +51,7 @@ public class DemoDataInitializer implements ApplicationRunner {
             tee.setParentSku("DEMO-TEE");
             tee.setColor(t[1]);
             tee.setSize(t[2]);
+            tee.setImageUrls(demoImage(tee).map(List::of).orElse(List.of()));
             tee.setBrand("StormWear");
             products.save(tee);
         }
@@ -82,6 +86,36 @@ public class DemoDataInitializer implements ApplicationRunner {
         p.setTitleEn(titleEn);
         p.setDescriptionEn(descriptionEn);
         p.setStatus(ProductStatus.ON_SALE);
+        p.setImageUrls(demoImage(p).map(List::of).orElse(List.of()));
         return products.save(p);
+    }
+
+    /** 早期版本写入的示例商品没有配图：补上（只处理 DEMO- 开头、且还没有图片的商品）。 */
+    private void addMissingDemoImages() {
+        for (Product p : products.findAll()) {
+            if (p.getSku() != null && p.getSku().startsWith("DEMO-") && p.getImageUrls().isEmpty()) {
+                demoImage(p).ifPresent(url -> p.setImageUrls(List.of(url)));
+            }
+        }
+    }
+
+    /** 示例商品的插图，放在 static/img/demo 下。 */
+    static Optional<String> demoImage(Product p) {
+        String sku = p.getSku();
+        String file;
+        if (sku.startsWith("DEMO-001")) {
+            boolean black = "Black".equalsIgnoreCase(p.getColor()) || p.getName().contains("黑");
+            file = black ? "tee-black" : "tee-white";
+        } else {
+            file = switch (sku) {
+                case "DEMO-002" -> "jeans";
+                case "DEMO-003" -> "mug";
+                case "DEMO-004" -> "pillow";
+                case "DEMO-005" -> "earbuds";
+                case "DEMO-006" -> "cable";
+                default -> null;
+            };
+        }
+        return Optional.ofNullable(file).map(f -> "/img/demo/" + f + ".svg");
     }
 }

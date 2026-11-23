@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ecfccb"/><stop offset="1" stop-color="#e0f2fe"/></linearGradient>
+    <radialGradient id="shadow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#0f172a" stop-opacity=".18"/><stop offset="1" stop-color="#0f172a" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="600" height="600" fill="url(#bg)"/>
+  <ellipse cx="300" cy="490" rx="190" ry="22" fill="url(#shadow)"/>
+  <path d="M130 140 Q300 110 470 140 Q500 300 470 460 Q300 490 130 460 Q100 300 130 140 Z" fill="#cbd5e1" stroke="#94a3b8" stroke-width="4"/>
+  <clipPath id="p"><path d="M130 140 Q300 110 470 140 Q500 300 470 460 Q300 490 130 460 Q100 300 130 140 Z"/></clipPath>
+  <g clip-path="url(#p)" fill="#64748b" opacity=".55">
+    <path d="M140 300 L220 220 L300 300 L380 220 L460 300 L460 330 L380 250 L300 330 L220 250 L140 330 Z"/>
+    <path d="M140 390 L220 310 L300 390 L380 310 L460 390 L460 420 L380 340 L300 420 L220 340 L140 420 Z" fill="#f8fafc" opacity=".9"/>
+  </g>
+  <path d="M150 150 Q300 128 450 150" fill="none" stroke="#ffffff" stroke-width="5" opacity=".7" stroke-linecap="round"/>
+</svg>

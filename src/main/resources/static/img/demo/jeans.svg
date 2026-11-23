@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0e7ff"/><stop offset="1" stop-color="#f1f5f9"/></linearGradient>
+    <radialGradient id="shadow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#0f172a" stop-opacity=".18"/><stop offset="1" stop-color="#0f172a" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="600" height="600" fill="url(#bg)"/>
+  <ellipse cx="300" cy="520" rx="150" ry="20" fill="url(#shadow)"/>
+  <path d="M206 96 H394 L412 506 Q412 514 404 514 H326 Q318 514 317 506 L300 238 L283 506 Q282 514 274 514 H196 Q188 514 188 506 Z" fill="#3b5b92" stroke="#2b4473" stroke-width="4" stroke-linejoin="round"/>
+  <rect x="206" y="96" width="188" height="30" fill="#33507f" stroke="#2b4473" stroke-width="4"/>
+  <circle cx="300" cy="111" r="6" fill="#d4a24c"/>
+  <path d="M300 126 V238" stroke="#2b4473" stroke-width="3"/>
+  <path d="M214 140 Q246 176 282 140 M386 140 Q354 176 318 140" fill="none" stroke="#e2b866" stroke-width="3" stroke-dasharray="6 6"/>
+  <path d="M200 488 H280 M320 488 H400" stroke="#e2b866" stroke-width="3" stroke-dasharray="6 6"/>
+  <path d="M232 96 V126 M368 96 V126" stroke="#2b4473" stroke-width="4"/>
+</svg>
