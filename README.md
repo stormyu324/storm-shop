@@ -4,25 +4,34 @@
 
 ## 快速开始
 
-只需要安装 **JDK 21**（不用装 Maven 和数据库，项目自带 Maven Wrapper）。
+只需要安装 **JDK 21 或更高版本**（不用装 Maven 和数据库）。没有的话到 https://adoptium.net 下载 Temurin 21 安装；macOS 也可以 `brew install openjdk@21`。
+
+下载代码（或在 GitHub 页面点 Code → Download ZIP 解压）：
 
 ```bash
 git clone https://github.com/stormyu324/storm-shop.git
-cd storm-shop
-git checkout claude/determined-gauss-5n658i
-
-# macOS / Linux
-./mvnw spring-boot:run
-# Windows
-mvnw.cmd spring-boot:run
 ```
 
-看到 `Started ShopApplication` 后打开浏览器：
+### 一键启动
+
+| 系统 | 操作 |
+| --- | --- |
+| **Windows** | 双击 `start.bat` |
+| **macOS** | 双击 `start.command`（第一次如果提示“无法验证开发者”，右键 → 打开） |
+| Linux / 终端 | `./start.sh` |
+
+启动脚本会检查 Java 版本、启动商城，并在启动完成后自动打开浏览器。第一次运行要下载依赖，需要几分钟。
 
 - 商城首页：http://localhost:8080
 - 管理后台：http://localhost:8080/admin （默认账号 `admin` / `admin123`）
 
-首次启动会自动写入几条示例商品（`DEMO_DATA=false` 可关闭）。按 `Ctrl + C` 停止。
+停止：关掉命令行窗口，或按 `Ctrl + C`。首次启动会自动写入几条示例商品（`DEMO_DATA=false` 可关闭）。
+
+### 配置文件
+
+把 `config.example.env` 复制一份，命名为 **`config.env`**，去掉需要的行前面的 `#` 填上值（后台密码、端口、AI 和 Stripe 的密钥等），启动脚本会自动读取。`config.env` 已加入 `.gitignore`，不会被提交。
+
+也可以不用脚本，直接运行 `./mvnw spring-boot:run`（Windows：`mvnw.cmd spring-boot:run`），配置通过环境变量传入。
 
 ## 上架商品的几种方式
 
