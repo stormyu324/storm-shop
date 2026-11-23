@@ -98,7 +98,7 @@ class PaymentFlowTest {
     String checkout(MockHttpSession session) throws Exception {
         return mvc.perform(post("/checkout").session(session).with(csrf()).param("lang", "en")
                         .param("customerName", "John Smith").param("phone", "+1 415 555 0100")
-                        .param("address", "1 Market St, San Francisco"))
+                        .param("address", "1 Market St, San Francisco").param("country", "US"))
                 .andReturn().getResponse().getRedirectedUrl();
     }
 
@@ -174,7 +174,7 @@ class PaymentFlowTest {
         MockHttpSession session = englishCartWith(1);
 
         mvc.perform(post("/checkout").session(session).with(csrf()).param("lang", "en")
-                        .param("customerName", "John").param("phone", "+1 415 555 0100").param("address", "SF"))
+                        .param("customerName", "John").param("phone", "+1 415 555 0100").param("address", "SF").param("country", "US"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Online payment is temporarily unavailable")));
 
@@ -207,7 +207,7 @@ class PaymentFlowTest {
         MockHttpSession session = new MockHttpSession();
         mvc.perform(post("/cart/add").session(session).with(csrf()).param("productId", tee.getId().toString()));
         mvc.perform(post("/checkout").session(session).with(csrf())
-                        .param("customerName", "张三").param("phone", "13800000000").param("address", "北京市"))
+                        .param("customerName", "张三").param("phone", "13800000000").param("address", "北京市").param("country", "CN"))
                 .andExpect(redirectedUrl("/order-success"));
         assertThat(onlyOrder().getStatus()).isEqualTo(OrderStatus.PLACED);
     }

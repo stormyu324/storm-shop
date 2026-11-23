@@ -16,11 +16,15 @@
             </tr>
             <tr>
                 <td colspan="2" class="num muted" th:text="#{checkout.shippingFee}">运费</td>
-                <td class="num" th:text="${cart.shipping.signum() == 0} ? #{cart.shippingFree} : ${@pricing.format(cart.shipping, cart.currency)}"></td>
+                <td class="num" id="shippingFee" th:text="${!cart.deliverable} ? '—' : (${cart.shipping.signum() == 0} ? #{cart.shippingFree} : ${@pricing.format(cart.shipping, cart.currency)})"></td>
             </tr>
             <tr>
                 <td colspan="2" class="num"><strong th:text="#{checkout.total}">合计</strong></td>
-                <td class="num price" th:text="${@pricing.format(cart.total, cart.currency)}"></td>
+                <td class="num price" id="grandTotal" th:text="${@pricing.format(cart.total, cart.currency)}"></td>
+            </tr>
+            <tr>
+                <td colspan="3" class="num free-hint" id="freeHint"
+                    th:text="${cart.freeRemaining != null} ? #{cart.freeShippingHint(${@pricing.format(cart.freeRemaining, cart.currency)})} : ''"></td>
             </tr>
         </table>
     </div>
@@ -39,6 +43,15 @@
             </div>
         </div>
         <div class="field">
+            <label for="country" th:text="#{checkout.country}">国家 / 地区</label>
+            <select id="country" th:field="*{country}" required autocomplete="country">
+                <option th:each="c : ${countries}" th:value="${c.code}" th:text="${c.name}"></option>
+            </select>
+            <div class="err" th:errors="*{country}"></div>
+            <div class="alert error" id="shipNotice" th:style="${cart.deliverable} ? 'display:none' : ''"
+                 th:text="${cart.deliverable} ? '' : #{error.shipping.unavailable(${T(com.javastorm.shop.service.Countries).name(cart.country, #locale)})}"></div>
+        </div>
+        <div class="field">
             <label for="address" th:text="#{checkout.address}">收货地址</label>
             <input id="address" th:field="*{address}" required maxlength="300" autocomplete="street-address">
             <div class="err" th:errors="*{address}"></div>
@@ -48,9 +61,29 @@
             <input id="note" th:field="*{note}" maxlength="500">
         </div>
         <p class="muted" th:text="${onlinePayment} ? #{checkout.onlinePayment} : #{checkout.noPayment}">本店暂未接入在线支付</p>
-        <button type="submit" th:text="${onlinePayment} ? #{checkout.submitPay} : #{checkout.submit}">提交订单</button>
+        <button type="submit" id="submitOrder" th:disabled="${!cart.deliverable}"
+                th:text="${onlinePayment} ? #{checkout.submitPay} : #{checkout.submit}">提交订单</button>
     </form>
 </main>
 <footer th:replace="~{fragments/layout :: footer}"></footer>
+<script>
+    (function () {
+        var select = document.getElementById('country');
+        if (!select) return;
+        select.addEventListener('change', function () {
+            fetch('/checkout/shipping?country=' + encodeURIComponent(select.value), {headers: {'Accept': 'application/json'}})
+                .then(function (res) { return res.json(); })
+                .then(function (d) {
+                    document.getElementById('shippingFee').textContent = d.shipping;
+                    document.getElementById('grandTotal').textContent = d.total;
+                    document.getElementById('freeHint').textContent = d.freeHint || '';
+                    var notice = document.getElementById('shipNotice');
+                    notice.textContent = d.notice || '';
+                    notice.style.display = d.deliverable ? 'none' : '';
+                    document.getElementById('submitOrder').disabled = !d.deliverable;
+                });
+        });
+    })();
+</script>
 </body>
 </html>

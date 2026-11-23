@@ -144,7 +144,7 @@ class DataSafetyTest {
             Callable<MvcResult> task = () -> {
                 start.await();
                 return mvc.perform(post("/checkout").session(session).with(csrf())
-                        .param("customerName", "张三").param("phone", "13800000000").param("address", "北京市"))
+                        .param("customerName", "张三").param("phone", "13800000000").param("address", "北京市").param("country", "CN"))
                         .andReturn();
             };
             results.add(pool.submit(task));

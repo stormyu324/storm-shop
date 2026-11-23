@@ -40,6 +40,10 @@ public class CustomerOrder {
     @Column(length = 500)
     private String note;
 
+    /** 寄往国家 / 地区（ISO 两位代码）；老订单为空。 */
+    @Column(length = 2)
+    private String country;
+
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal total = BigDecimal.ZERO;
 
@@ -112,6 +116,14 @@ public class CustomerOrder {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public String getCountry() {
+        return country;
+    }
+
+    public void setCountry(String country) {
+        this.country = country;
     }
 
     public String getNote() {

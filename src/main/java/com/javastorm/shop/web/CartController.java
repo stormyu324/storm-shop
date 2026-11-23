@@ -10,6 +10,8 @@ import com.javastorm.shop.repository.ProductRepository;
 import com.javastorm.shop.service.BusinessException;
 import com.javastorm.shop.service.Cart;
 import com.javastorm.shop.service.CartView;
+import com.javastorm.shop.service.Countries;
+import com.javastorm.shop.service.Pricing;
 import com.javastorm.shop.service.OrderService;
 import com.javastorm.shop.web.form.CheckoutForm;
 import jakarta.validation.Valid;
@@ -25,6 +27,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -33,6 +40,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class CartController {
 
     private static final int MAX_ORDER_ATTEMPTS = 3;
+    static final String SHIP_COUNTRY = "shipCountry";
 
     private final Cart cart;
     private final OrderService orderService;
@@ -42,10 +50,15 @@ public class CartController {
     private final StripePaymentService stripe;
     private final PaymentFlow paymentFlow;
     private final String publicBaseUrl;
+    private final HttpSession session;
+    private final Pricing pricing;
 
     public CartController(Cart cart, OrderService orderService, ProductRepository products,
                           MessageSource messages, GlobalModelAdvice advice, StripePaymentService stripe,
-                          PaymentFlow paymentFlow, @Value("${shop.public-base-url:}") String publicBaseUrl) {
+                          PaymentFlow paymentFlow, @Value("${shop.public-base-url:}") String publicBaseUrl,
+                          HttpSession session, Pricing pricing) {
+        this.session = session;
+        this.pricing = pricing;
         this.cart = cart;
         this.orderService = orderService;
         this.products = products;
@@ -98,18 +111,52 @@ public class CartController {
         if (view.isEmpty()) {
             return "redirect:/cart";
         }
+        CheckoutForm form = new CheckoutForm();
+        form.setCountry(shipCountry());
         model.addAttribute("cart", view);
-        model.addAttribute("form", new CheckoutForm());
+        model.addAttribute("form", form);
+        model.addAttribute("countries", Countries.list(LocaleContextHolder.getLocale()));
         return "store/checkout";
+    }
+
+    /** 结账页切换国家时重新计算运费（页面上用 JavaScript 调用）。 */
+    @GetMapping("/checkout/shipping")
+    @ResponseBody
+    public Map<String, Object> shippingFor(@RequestParam String country) {
+        if (Countries.isValid(country)) {
+            session.setAttribute(SHIP_COUNTRY, country.toUpperCase(Locale.ROOT));
+        }
+        CartView view = view();
+        Locale locale = LocaleContextHolder.getLocale();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("deliverable", view.deliverable());
+        body.put("shipping", !view.deliverable() ? "—" : view.shipping().signum() == 0
+                ? messages.getMessage("cart.shippingFree", null, locale)
+                : pricing.format(view.shipping(), view.currency()));
+        body.put("total", pricing.format(view.total(), view.currency()));
+        body.put("freeHint", view.freeRemaining() == null ? null
+                : messages.getMessage("cart.freeShippingHint",
+                new Object[]{pricing.format(view.freeRemaining(), view.currency())}, locale));
+        body.put("notice", view.deliverable() ? null
+                : messages.getMessage("error.shipping.unavailable",
+                new Object[]{Countries.name(view.country(), locale)}, locale));
+        return body;
     }
 
     @PostMapping("/checkout")
     public String placeOrder(@Valid @ModelAttribute("form") CheckoutForm form, BindingResult binding, Model model,
                              RedirectAttributes flash, HttpSession httpSession) {
+        if (!binding.hasFieldErrors("country") && Countries.isValid(form.getCountry())) {
+            httpSession.setAttribute(SHIP_COUNTRY, form.getCountry());
+        } else if (!binding.hasFieldErrors("country")) {
+            binding.rejectValue("country", "invalid",
+                    messages.getMessage("checkout.country.required", null, LocaleContextHolder.getLocale()));
+        }
         CartView view = view();
         if (view.isEmpty()) {
             return "redirect:/cart";
         }
+        model.addAttribute("countries", Countries.list(LocaleContextHolder.getLocale()));
         if (binding.hasErrors()) {
             model.addAttribute("cart", view);
             return "store/checkout";
@@ -166,7 +213,16 @@ public class CartController {
         return ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString();
     }
 
+    /** 运费按哪个国家算：顾客选过的，否则按前台默认（英文前台美国，中文前台中国）。 */
+    private String shipCountry() {
+        Object chosen = session.getAttribute(SHIP_COUNTRY);
+        if (chosen != null) {
+            return chosen.toString();
+        }
+        return LocaleConfig.isEnglish() ? "US" : "CN";
+    }
+
     private CartView view() {
-        return orderService.view(cart, LocaleConfig.currentCurrency());
+        return orderService.view(cart, LocaleConfig.currentCurrency(), shipCountry());
     }
 }

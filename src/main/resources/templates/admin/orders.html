@@ -33,7 +33,7 @@
                 </td>
                 <td>
                     <div th:text="${o.customerName} + '  ' + ${o.phone}"></div>
-                    <div class="muted" style="font-size:.85rem" th:text="${o.address}"></div>
+                    <div class="muted" style="font-size:.85rem"><th:block th:if="${o.country}" th:text="${T(com.javastorm.shop.service.Countries).name(o.country, #locale)} + ' · '"></th:block><th:block th:text="${o.address}"></th:block></div>
                     <div class="muted" style="font-size:.85rem" th:if="${o.note}" th:text="'备注：' + ${o.note}"></div>
                 </td>
                 <td><span class="tag" th:classappend="${o.status}" th:text="${o.status.label}"></span></td>

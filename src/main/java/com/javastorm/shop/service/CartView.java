@@ -13,9 +13,11 @@ import java.util.List;
  * @param shipping      运费
  * @param total         应付总额 = 商品金额 + 运费
  * @param freeRemaining 还差多少可以包邮，没有包邮门槛或已包邮时为 null
+ * @param country       运费按哪个国家计算（两位代码）
+ * @param deliverable   是否配送到这个国家
  */
 public record CartView(List<Line> lines, BigDecimal subtotal, BigDecimal shipping, BigDecimal total,
-                       Currency currency, BigDecimal freeRemaining) {
+                       Currency currency, BigDecimal freeRemaining, String country, boolean deliverable) {
 
     public record Line(Product product, int quantity, BigDecimal unitPrice) {
         public BigDecimal getSubtotal() {

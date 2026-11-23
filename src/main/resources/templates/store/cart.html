@@ -54,8 +54,11 @@
         <div class="card actions" style="justify-content:flex-end">
             <span class="muted free-hint" th:if="${cart.freeRemaining != null}"
                   th:text="#{cart.freeShippingHint(${@pricing.format(cart.freeRemaining, cart.currency)})}">再买 ¥10.00 即可包邮</span>
-            <span class="muted"><th:block th:text="#{cart.shipping}">运费：</th:block><span
-                    th:text="${cart.shipping.signum() == 0} ? #{cart.shippingFree} : ${@pricing.format(cart.shipping, cart.currency)}"></span></span>
+            <span class="muted" th:if="${cart.deliverable}"><th:block th:text="#{cart.shipping}">运费：</th:block><span
+                    th:text="${cart.shipping.signum() == 0} ? #{cart.shippingFree} : ${@pricing.format(cart.shipping, cart.currency)}"></span>
+                <span th:text="#{cart.shipTo(${T(com.javastorm.shop.service.Countries).name(cart.country, #locale)})}">（寄往中国，结算时可更改）</span></span>
+            <span class="muted" th:unless="${cart.deliverable}"
+                  th:text="#{error.shipping.unavailable(${T(com.javastorm.shop.service.Countries).name(cart.country, #locale)})}"></span>
             <span><th:block th:text="#{cart.total}">合计：</th:block><span class="price" th:text="${@pricing.format(cart.total, cart.currency)}"></span></span>
             <a th:if="${cart.allAvailable}" th:href="@{/checkout}" class="btn" th:text="#{cart.checkout}">去结算</a>
             <span th:unless="${cart.allAvailable}" class="muted" th:text="#{cart.fixFirst}">请先调整不可购买的商品</span>

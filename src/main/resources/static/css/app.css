@@ -298,6 +298,18 @@ input[type=file]::file-selector-button {
 .ai-bar .muted { font-size: .85rem; }
 .free-hint { color: var(--success); font-size: .88rem; }
 
+/* 运费设置 */
+.grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 14px; }
+h3.sub { font-size: .95rem; margin: 22px 0 10px; color: var(--text-2); }
+label.check { display: block; font-weight: 400; margin-bottom: 10px; }
+.add-zone { margin: 12px 0 4px; padding: 12px 16px; border: 1px dashed var(--border-strong); border-radius: 12px; }
+.add-zone summary { cursor: pointer; color: var(--primary); font-weight: 600; }
+.add-zone form { margin-top: 14px; }
+table.zones input { min-width: 0; width: 100%; }
+table.zones td { vertical-align: top; }
+.country-names { font-size: .8rem; margin-top: 4px; }
+@media (max-width: 720px) { .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 /* ===== 商品详情 ===== */
 .crumbs { font-size: .88rem; color: var(--muted); margin-bottom: 16px; }
 .crumbs a { color: var(--muted); }

@@ -21,6 +21,19 @@ public class CheckoutForm {
     @Size(max = 500)
     private String note;
 
+    /** 寄往国家 / 地区，ISO 两位代码。 */
+    @NotBlank(message = "{checkout.country.required}")
+    @Pattern(regexp = "^[A-Za-z]{2}$", message = "{checkout.country.required}")
+    private String country;
+
+    public String getCountry() {
+        return country;
+    }
+
+    public void setCountry(String country) {
+        this.country = country == null ? null : country.trim().toUpperCase(java.util.Locale.ROOT);
+    }
+
     public String getCustomerName() {
         return customerName;
     }

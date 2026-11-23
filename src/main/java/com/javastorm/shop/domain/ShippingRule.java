@@ -15,7 +15,7 @@ import java.math.BigDecimal;
  * 运费 = 首重运费 + 超出首重的部分每公斤加价（不足 1 公斤按 1 公斤算）；商品金额达到包邮门槛时免运费。
  */
 @Entity
-public class ShippingRule {
+public class ShippingRule implements ShippingFees {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -42,11 +42,22 @@ public class ShippingRule {
     @Column(precision = 12, scale = 2)
     private BigDecimal freeThreshold;
 
+    /** true 时只配送到运费分组里列出的国家，其他国家不能下单。老数据为空，视为 false。 */
+    private Boolean zonesOnly;
+
     protected ShippingRule() {
     }
 
     public ShippingRule(Currency currency) {
         this.currency = currency;
+    }
+
+    public boolean isZonesOnly() {
+        return Boolean.TRUE.equals(zonesOnly);
+    }
+
+    public void setZonesOnly(boolean zonesOnly) {
+        this.zonesOnly = zonesOnly;
     }
 
     public Long getId() {
@@ -65,6 +76,7 @@ public class ShippingRule {
         this.enabled = enabled;
     }
 
+    @Override
     public BigDecimal getBaseFee() {
         return baseFee;
     }
@@ -73,6 +85,7 @@ public class ShippingRule {
         this.baseFee = baseFee == null ? BigDecimal.ZERO : baseFee;
     }
 
+    @Override
     public int getIncludedGrams() {
         return includedGrams;
     }
@@ -81,6 +94,7 @@ public class ShippingRule {
         this.includedGrams = Math.max(0, includedGrams);
     }
 
+    @Override
     public BigDecimal getExtraPerKg() {
         return extraPerKg;
     }
@@ -89,6 +103,7 @@ public class ShippingRule {
         this.extraPerKg = extraPerKg;
     }
 
+    @Override
     public BigDecimal getFreeThreshold() {
         return freeThreshold;
     }

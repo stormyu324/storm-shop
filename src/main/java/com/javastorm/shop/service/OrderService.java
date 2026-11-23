@@ -47,6 +47,12 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public CartView view(Cart cart, Currency currency) {
+        return view(cart, currency, null);
+    }
+
+    /** @param country 寄往国家，运费按它计算；为空时按默认规则估算 */
+    @Transactional(readOnly = true)
+    public CartView view(Cart cart, Currency currency, String country) {
         List<CartView.Line> lines = new ArrayList<>();
         BigDecimal subtotal = BigDecimal.ZERO;
         int weight = 0;
@@ -60,8 +66,9 @@ public class OrderService {
             subtotal = subtotal.add(line.getSubtotal());
             weight += weightOf(p, e.getValue());
         }
-        ShippingService.Quote quote = shipping.quote(currency, subtotal, weight);
-        return new CartView(lines, subtotal, quote.fee(), subtotal.add(quote.fee()), currency, quote.freeRemaining());
+        ShippingService.Quote quote = shipping.quote(currency, country, subtotal, weight);
+        return new CartView(lines, subtotal, quote.fee(), subtotal.add(quote.fee()), currency, quote.freeRemaining(),
+                country, quote.deliverable());
     }
 
     /** 没填重量的商品按 0 克计算。 */
@@ -90,6 +97,7 @@ public class OrderService {
         order.setPhone(form.getPhone().trim());
         order.setAddress(form.getAddress().trim());
         order.setNote(form.getNote());
+        order.setCountry(form.getCountry());
         order.setCurrency(currency);
         if (awaitingPayment) {
             order.setStatus(OrderStatus.PENDING_PAYMENT);
@@ -113,7 +121,12 @@ public class OrderService {
             order.addItem(new OrderItem(p, title, pricing.price(p, currency), qty));
             weight += weightOf(p, qty);
         }
-        order.addShippingFee(shipping.quote(currency, order.getTotal(), weight).fee());
+        ShippingService.Quote quote = shipping.quote(currency, form.getCountry(), order.getTotal(), weight);
+        if (!quote.deliverable()) {
+            throw new BusinessException("error.shipping.unavailable", "抱歉，暂不配送到所选国家 / 地区",
+                    Countries.name(form.getCountry(), english ? java.util.Locale.ENGLISH : java.util.Locale.SIMPLIFIED_CHINESE));
+        }
+        order.addShippingFee(quote.fee());
         CustomerOrder saved = orders.save(order);
         // 事务提交成功后才清空购物车；提交失败（例如并发抢购导致版本冲突）时顾客的购物车保持不变
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {

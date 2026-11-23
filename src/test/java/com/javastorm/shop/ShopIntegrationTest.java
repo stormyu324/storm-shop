@@ -188,7 +188,7 @@ class ShopIntegrationTest {
                 .andExpect(redirectedUrl("/products/" + p.getId()));
         mvc.perform(get("/cart").session(session)).andExpect(content().string(containsString("商品WEB-1")));
         mvc.perform(post("/checkout").session(session).with(csrf())
-                        .param("customerName", "张三").param("phone", "13800000000").param("address", "北京市"))
+                        .param("customerName", "张三").param("phone", "13800000000").param("address", "北京市").param("country", "CN"))
                 .andExpect(redirectedUrl("/order-success"));
         assertThat(orders.count()).isEqualTo(1);
         assertThat(products.findById(p.getId()).orElseThrow().getStock()).isEqualTo(1);

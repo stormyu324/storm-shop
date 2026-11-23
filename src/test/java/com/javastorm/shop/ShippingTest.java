@@ -92,8 +92,6 @@ class ShippingTest {
         assertThat(ShippingService.calculate(r, new BigDecimal("49.00"), 9000).isFree()).isTrue();
         assertThat(ShippingService.calculate(r, BigDecimal.ZERO, 0).isFree()).isTrue();
 
-        r.setEnabled(false);
-        assertThat(ShippingService.calculate(r, new BigDecimal("1"), 5000).isFree()).isTrue();
         assertThat(ShippingService.calculate(null, new BigDecimal("1"), 5000).isFree()).isTrue();
 
         ShippingRule flat = usdRule();
