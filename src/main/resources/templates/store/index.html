@@ -19,6 +19,14 @@
             <div class="hero-tile small-tile"><img th:src="@{/img/demo/earbuds.svg}" alt=""></div>
         </div>
     </section>
+    <nav class="department-nav" th:if="${q == null and category == null and products.number == 0 and !categories.empty}"
+         th:aria-label="#{store.categories}">
+        <a class="department-link" th:each="c : ${categories}" th:href="@{/(category=${c.id})}">
+            <span class="department-mark" aria-hidden="true"></span>
+            <span th:text="${c.title(en)}">商品分类</span>
+            <span class="department-chevron" aria-hidden="true"></span>
+        </a>
+    </nav>
     <section class="ai-shop card" th:if="${aiShopping and q == null and category == null and products.number == 0}"
              th:attr="data-ai-thinking=#{ai.thinking},data-ai-error=#{ai.error},data-ai-empty=#{ai.empty},data-ai-from=#{ai.from}">
         <div class="ai-head">
@@ -78,6 +86,7 @@
                         <img th:src="${p.mainImage != null} ? ${p.mainImage} : @{/img/placeholder.svg}" th:alt="${p.title(en)}" loading="lazy">
                     </div>
                     <div class="info">
+                        <div class="product-category" th:if="${p.category != null}" th:text="${p.category.title(en)}">分类</div>
                         <div class="name" th:text="${f != null and f.title(en) != null} ? ${f.title(en)} : ${p.title(en)}">商品名称</div>
                         <div th:if="${f != null and f.priceVaries}">
                             <span class="price" th:text="#{product.priceFrom(${@pricing.format(f.minPrice, currency)})}">¥0.00 起</span>
@@ -86,6 +95,7 @@
                             <span class="price" th:text="${@pricing.formatPrice(p, currency)}">¥0.00</span>
                             <span class="orig" th:if="${p.hasDiscount()}" th:text="${@pricing.formatOriginalPrice(p, currency)}"></span>
                         </div>
+                        <span class="product-open" aria-hidden="true"></span>
                         <div class="variant-count" th:if="${f != null and f.variantCount > 1}"
                              th:text="#{product.variantCount(${f.variantCount})}">3 个规格</div>
                         <div class="soldout" th:if="${f != null} ? ${!f.inStock} : ${p.stock <= 0}" th:text="#{product.soldOut}">已售罄</div>
