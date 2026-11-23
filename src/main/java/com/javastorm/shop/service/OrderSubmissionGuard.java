@@ -1,49 +1,109 @@
 package com.javastorm.shop.service;
 
-import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
-/** Single-instance submission protection. Entries expire after ten minutes. */
+/**
+ * 防止重复下单（单机内存实现）：同一个顾客用同一个下单标识重复提交时，只真正下一次单，后面的请求直接拿到第一次的结果。
+ * <ul>
+ *   <li>只记住<b>成功</b>的下单结果；失败的请求不占名额，也不会被“记住”，改正后可以直接重试。</li>
+ *   <li>记录满了淘汰最旧的一条，不会因为记录太多而拒绝所有人下单。</li>
+ *   <li>同一 IP 10 分钟内最多尝试下单 {@link #PER_ADDRESS} 次（命中已有结果的重复提交不计）。</li>
+ * </ul>
+ */
 @Component
 public class OrderSubmissionGuard {
-    private record Result(String fingerprint, Object value) {}
-    private static final class Client {
-        final Instant created = Instant.now();
-        int attempts;
-        final Map<String, Result> results = new LinkedHashMap<>();
-    }
-    private final RateLimiter limiter = new RateLimiter(20, 10000, java.time.Clock.systemUTC());
-    private final Map<String, Client> clients = new LinkedHashMap<>();
 
-    public <T> T submit(String clientId, String address, String key, String fingerprint, Supplier<T> action) {
-        Client client;
-        synchronized (clients) {
-            clients.entrySet().removeIf(e -> e.getValue().created.plusSeconds(600).isBefore(Instant.now()));
-            if (!clients.containsKey(clientId) && clients.size() >= 10000) {
-                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "下单人数较多，请稍后重试");
-            }
-            client = clients.computeIfAbsent(clientId, ignored -> new Client());
+    /** 显式传了 Idempotency-Key 的请求，结果保留 10 分钟。 */
+    public static final Duration KEY_TTL = Duration.ofMinutes(10);
+    /** 没传标识时按订单内容自动去重，只防双击和网络重试，30 秒后同样的订单可以再下。 */
+    public static final Duration AUTO_TTL = Duration.ofSeconds(30);
+    static final int MAX_ENTRIES = 10_000;
+    static final int PER_ADDRESS = 20;
+
+    private record Result(String fingerprint, Object value, Instant expires) {
+    }
+
+    private final Clock clock;
+    private final RateLimiter limiter;
+    private final Map<String, Object> inFlight = new ConcurrentHashMap<>();
+    private final Map<String, Result> results = new LinkedHashMap<>(256, 0.75f, false) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Result> eldest) {
+            return size() > MAX_ENTRIES;
         }
-        synchronized (client) {
-            Result previous = client.results.get(key);
-            if (previous != null) {
-                if (!previous.fingerprint().equals(fingerprint)) {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "同一下单标识对应的订单内容不同");
+    };
+
+    @Autowired
+    public OrderSubmissionGuard() {
+        this(Clock.systemUTC());
+    }
+
+    OrderSubmissionGuard(Clock clock) {
+        this.clock = clock;
+        this.limiter = new RateLimiter(PER_ADDRESS, Integer.MAX_VALUE, clock);
+    }
+
+    /**
+     * @param clientId    顾客标识（会话 ID 等）；为空时不做去重，只限制频率
+     * @param address     来源 IP，用于频率限制
+     * @param key         下单标识（显式的 Idempotency-Key，或按内容生成的指纹）
+     * @param fingerprint 订单内容指纹：同一个标识对应的内容不同时拒绝
+     * @param ttl         结果保留多久
+     */
+    public <T> T submit(String clientId, String address, String key, String fingerprint, Duration ttl, Supplier<T> action) {
+        if (clientId == null) {
+            checkRate(address);
+            return action.get();
+        }
+        String fullKey = clientId + "\n" + key;
+        Object lock = inFlight.computeIfAbsent(fullKey, k -> new Object());
+        try {
+            synchronized (lock) {
+                Result previous = cached(fullKey);
+                if (previous != null) {
+                    if (!previous.fingerprint().equals(fingerprint)) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, "同一下单标识对应的订单内容不同");
+                    }
+                    @SuppressWarnings("unchecked") T value = (T) previous.value();
+                    return value;
                 }
-                @SuppressWarnings("unchecked") T value = (T) previous.value();
+                checkRate(address);
+                T value = action.get(); // 抛出异常时什么都不记，顾客改正后可以重试
+                synchronized (results) {
+                    results.put(fullKey, new Result(fingerprint, value, clock.instant().plus(ttl)));
+                }
                 return value;
             }
-            if (++client.attempts > 20 || limiter.tryAcquire(address) != null) {
-                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "下单过于频繁，请稍后重试");
+        } finally {
+            inFlight.remove(fullKey, lock);
+        }
+    }
+
+    private Result cached(String fullKey) {
+        synchronized (results) {
+            Result r = results.get(fullKey);
+            if (r != null && r.expires().isBefore(clock.instant())) {
+                results.remove(fullKey);
+                return null;
             }
-            T value = action.get();
-            client.results.put(key, new Result(fingerprint, value));
-            return value;
+            return r;
+        }
+    }
+
+    private void checkRate(String address) {
+        if (limiter.tryAcquire(address == null ? "unknown" : address) != null) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "下单过于频繁，请稍后重试");
         }
     }
 }

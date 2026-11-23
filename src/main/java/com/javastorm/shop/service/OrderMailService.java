@@ -46,6 +46,9 @@ public class OrderMailService {
     mails.save(mail);
   }
 
+  /** 订单通知的有效期：邮件服务长时间没配置或故障时，过期的旧通知不再补发。 */
+  static final java.time.Duration ORDER_NOTICE_TTL = java.time.Duration.ofDays(3);
+
   public void order(CustomerOrder order, String event, String detail) {
     enqueue(
         order.getId() + ":" + event,
@@ -61,7 +64,7 @@ public class OrderMailService {
             + " "
             + order.getTotal()
             + "\n请回到商城“订单查询”页面查看详情。 / Visit Order lookup in the store.",
-        null);
+        LocalDateTime.now().plus(ORDER_NOTICE_TTL));
   }
 
   @Scheduled(fixedDelay = 30000, initialDelay = 15000)

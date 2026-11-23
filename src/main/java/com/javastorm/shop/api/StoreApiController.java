@@ -71,16 +71,15 @@ public class StoreApiController {
     private final Validator validator;
     private final com.javastorm.shop.service.CouponService coupons;
     private final com.javastorm.shop.service.MemberService members;
-    private final jakarta.servlet.http.HttpSession memberSession;
     private final com.javastorm.shop.service.OrderSubmissionGuard submissions;
 
     public StoreApiController(ProductService productService, ProductRepository products, CategoryRepository categories,
                               VariantService variantService, OrderService orderService, OrderPlacer orderPlacer,
                               StripePaymentService stripe, PaymentFlow paymentFlow, SiteUrls siteUrls,
                               ApiMapper mapper, Validator validator, com.javastorm.shop.service.OrderSubmissionGuard submissions,
-            com.javastorm.shop.service.CouponService coupons,com.javastorm.shop.service.MemberService members,
-            jakarta.servlet.http.HttpSession memberSession) {
-        this.coupons=coupons;this.members=members;this.memberSession=memberSession;
+            com.javastorm.shop.service.CouponService coupons,com.javastorm.shop.service.MemberService members) {
+        this.coupons = coupons;
+        this.members = members;
         this.submissions = submissions;
         this.productService = productService;
         this.products = products;
@@ -172,18 +171,25 @@ public class StoreApiController {
         Currency cur = currency(req.currency());
         String fingerprint = org.springframework.util.DigestUtils.md5DigestAsHex(
                 (req.toString() + cur.name()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        // 顾客标识：有会话用会话；没有会话（App 等不带 Cookie 的调用方）时只有显式传了 Idempotency-Key 才去重，
+        // 不为每个请求新建会话
+        jakarta.servlet.http.HttpSession existing = http.getSession(false);
+        String clientId = existing != null ? "session:" + existing.getId()
+                : key != null ? "ip:" + http.getRemoteAddr() : null;
         String requestKey = key == null ? "auto:" + fingerprint : "key:" + key;
-        return submissions.submit(http.getSession().getId(), http.getRemoteAddr(), requestKey, fingerprint, () -> createOrder(req, cur));
+        java.time.Duration ttl = key == null ? com.javastorm.shop.service.OrderSubmissionGuard.AUTO_TTL
+                : com.javastorm.shop.service.OrderSubmissionGuard.KEY_TTL;
+        return submissions.submit(clientId, http.getRemoteAddr(), requestKey, fingerprint, ttl, () -> createOrder(req, cur, existing));
     }
 
-    private OrderCreated createOrder(OrderRequest req, Currency cur) {
+    private OrderCreated createOrder(OrderRequest req, Currency cur, jakarta.servlet.http.HttpSession session) {
         CheckoutForm form = new CheckoutForm();
         form.setCustomerName(req.customerName());
         form.setPhone(req.phone());
         form.setAddress(req.address());
         form.setNote(req.note());
         form.setEmail(req.email());
-        var member=members.current(memberSession);
+        var member = members.current(session); // 已登录会员下单时，订单邮箱固定为会员邮箱
         if(member!=null) form.setEmail(member.email);
         form.setCouponCode(req.couponCode());
         form.setCountry(req.country());

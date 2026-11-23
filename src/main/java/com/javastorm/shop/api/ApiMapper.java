@@ -72,9 +72,16 @@ public class ApiMapper {
                 p.getBarcode(), p.getPriceUsd(), p.getVersion(), p.getCreatedAt(), p.getUpdatedAt());
     }
 
+    /** 已付款的订单不能直接取消，要走售后退款（OrderService.changeStatus 也会拒绝），按钮就不显示“取消”。 */
+    static java.util.List<com.javastorm.shop.domain.OrderStatus> nextStatuses(CustomerOrder o) {
+        var next = o.getStatus().getNextStatuses();
+        return o.getPaidAt() == null ? next
+                : next.stream().filter(s -> s != com.javastorm.shop.domain.OrderStatus.CANCELLED).toList();
+    }
+
     public AdminOrder adminOrder(CustomerOrder o) {
         return new AdminOrder(o.getId(), o.getOrderNo(), o.getStatus(), o.getStatus().getLabel(),
-                o.getStatus().getNextStatuses(), o.getCurrency(), o.getItemsTotal(), o.getShippingFee(), o.getTotal(),
+                nextStatuses(o), o.getCurrency(), o.getItemsTotal(), o.getShippingFee(), o.getTotal(),
                 o.getCustomerName(), o.getPhone(), o.getCountry(), o.getAddress(), o.getNote(),
                 o.getItems().stream().map(i -> new OrderLine(i.getProductId(), i.getProductName(), i.getSku(),
                         i.getUnitPrice(), i.getQuantity(), i.getSubtotal())).toList(),

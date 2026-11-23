@@ -33,6 +33,16 @@ public class AnalyticsService {
       List<Daily> daily,
       List<TopProduct> topProducts) {}
 
+  /**
+   * 是否算作已收款：在线支付以付款时间为准；线下确认的订单（没有在线支付）发货、完成或退款后才算收款，
+   * 否则默认的人民币线下流程收入永远显示为 0。
+   */
+  static boolean received(CustomerOrder o) {
+    if (o.getPaidAt() != null) return true;
+    return o.getPaymentSessionId() == null
+        && java.util.Set.of(OrderStatus.SHIPPED, OrderStatus.COMPLETED, OrderStatus.REFUNDED).contains(o.getStatus());
+  }
+
   @Transactional(readOnly = true)
   public List<Summary> report(LocalDate start, LocalDate end) {
     if (start == null
@@ -46,7 +56,7 @@ public class AnalyticsService {
     List<Summary> report = new ArrayList<>();
     for (Currency currency : Currency.values()) {
       var list = all.stream().filter(o -> o.getCurrency() == currency).toList();
-      var paid = list.stream().filter(o -> o.getPaidAt() != null).toList();
+      var paid = list.stream().filter(AnalyticsService::received).toList();
       BigDecimal gross =
           paid.stream().map(CustomerOrder::getTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
       BigDecimal refunded =
@@ -58,7 +68,7 @@ public class AnalyticsService {
       for (LocalDate day = start; !day.isAfter(end); day = day.plusDays(1)) {
         LocalDate date = day;
         var rows = list.stream().filter(o -> o.getCreatedAt().toLocalDate().equals(date)).toList();
-        var dayPaid = rows.stream().filter(o -> o.getPaidAt() != null).toList();
+        var dayPaid = rows.stream().filter(AnalyticsService::received).toList();
         daily.add(
             new Daily(
                 day,

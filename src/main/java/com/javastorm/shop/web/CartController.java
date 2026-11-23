@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -137,8 +138,14 @@ public class CartController {
         body.put("shipping", !view.deliverable() ? "—" : view.shipping().signum() == 0
                 ? messages.getMessage("cart.shippingFree", null, locale)
                 : pricing.format(view.shipping(), view.currency()));
-        var discount=coupons.preview(couponCode,view.subtotal(),view.currency());
-        body.put("discount",pricing.format(discount,view.currency()));
+        // 优惠码无效时不影响运费和合计的显示，只在优惠码旁边提示原因（这是 JSON 接口，不能抛出走错误页）
+        BigDecimal discount = BigDecimal.ZERO;
+        try {
+            discount = coupons.preview(couponCode, view.subtotal(), view.currency());
+        } catch (BusinessException e) {
+            body.put("couponError", e.getMessage());
+        }
+        body.put("discount", discount.signum() > 0 ? pricing.format(discount, view.currency()) : null);
         body.put("total", pricing.format(view.total().subtract(discount), view.currency()));
         body.put("freeHint", view.freeRemaining() == null ? null
                 : messages.getMessage("cart.freeShippingHint",

@@ -34,10 +34,11 @@ public class SecurityConfig {
                 .addFilterBefore(staffSessions, org.springframework.security.web.authentication.AnonymousAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/admin/session").permitAll()
-                         .requestMatchers("/api/admin/staff/**","/api/admin/audit/**","/api/admin/orders/*/after-sales/*").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/staff/**","/api/admin/audit/**","/api/admin/orders/*/after-sales/*").hasRole("ADMIN")
                         .requestMatchers("/api/admin/orders/**").hasAnyRole("ADMIN","SUPPORT")
                         .requestMatchers("/api/admin/coupons/**","/api/admin/analytics/**").hasAnyRole("ADMIN","OPERATIONS")
-                        .requestMatchers("/api/admin/products/**","/api/admin/categories/**","/api/admin/shipping/**","/api/admin/ai/**","/api/admin/export/**").hasAnyRole("ADMIN","CATALOG")
+                        // 商品管理：商品、图片上传、分类、运费、AI 英文资料、平台导出
+                        .requestMatchers("/api/admin/products/**","/api/admin/images","/api/admin/categories/**","/api/admin/shipping/**","/api/admin/ai/**","/api/admin/export/**").hasAnyRole("ADMIN","CATALOG")
                         .requestMatchers("/api/admin/dashboard").hasAnyRole("ADMIN","STAFF")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().permitAll())

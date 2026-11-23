@@ -28,7 +28,8 @@
             </tr>
         </table>
     </div>
-    <form class="card" th:action="@{/checkout}" th:object="${form}" method="post">
+    <form class="card" th:action="@{/checkout}" th:object="${form}" method="post"
+          onsubmit="var b = document.getElementById('submitOrder'); if (b.dataset.sent) return false; b.dataset.sent = '1'; b.disabled = true; return true;">
         <div class="field" id="saved-addresses" hidden><label for="saved-address">会员地址 / Saved address</label><select id="saved-address"><option value="">手动填写 / Enter manually</option></select></div>
         <div class="field">
             <label for="email" th:text="${en} ? 'Email for order updates and secure lookup' : '邮箱（接收通知与查询验证码）'"></label>
@@ -82,10 +83,10 @@
         if (!select) return;
         select.addEventListener('change', function () {
             fetch('/checkout/shipping?country=' + encodeURIComponent(select.value) + '&couponCode=' + encodeURIComponent(document.getElementById('couponCode').value), {headers: {'Accept': 'application/json'}})
-                .then(function (res) { if (!res.ok) throw new Error('优惠码不可用 / Coupon unavailable'); return res.json(); })
+                .then(function (res) { if (!res.ok) throw new Error('网络错误，请重试 / Network error'); return res.json(); })
                 .then(function (d) {
-                    document.getElementById('couponFeedback').textContent = '';
-                    document.getElementById('couponDiscount').textContent = '优惠 / Discount ' + d.discount;
+                    document.getElementById('couponFeedback').textContent = d.couponError || '';
+                    document.getElementById('couponDiscount').textContent = d.discount ? '优惠 / Discount ' + d.discount : '';
                     document.getElementById('shippingFee').textContent = d.shipping;
                     document.getElementById('grandTotal').textContent = d.total;
                     document.getElementById('freeHint').textContent = d.freeHint || '';
