@@ -4,7 +4,7 @@
     <el-card>
       <el-date-picker v-model="range" type="daterange" value-format="YYYY-MM-DD" start-placeholder="开始日期" end-placeholder="结束日期" />
       <el-button :loading="busy" @click="load">查询</el-button>
-      <p class="muted">按下单日期统计，退款按当前订单状态归集。人民币和美元分别统计，付款转化率为已付款订单数占创建订单数的比例。</p>
+      <p class="muted">按下单日期统计，线下订单在后台确认收款后计入，退款按当前订单状态归集。人民币和美元分别统计，付款转化率为已付款订单数占创建订单数的比例。</p>
     </el-card>
     <el-card v-for="s in summaries" :key="s.currency" style="margin-top: 18px">
       <h2>{{ s.currency }}</h2>

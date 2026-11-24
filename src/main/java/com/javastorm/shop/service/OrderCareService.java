@@ -176,7 +176,7 @@ public class OrderCareService {
                 a.setProviderFailed(false);
             }
             a.setAttempts(0);
-            a.setNextAttempt(LocalDateTime.now());
+            a.setNextAttempt(LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS));
         } else if ("CONFIRM_MANUAL".equals(action)) {
             if (!"MANUAL_REQUIRED".equals(a.getState()) || note == null || note.isBlank()) {
                 throw new BusinessException("请核实线下退款并填写退款凭据");
@@ -215,7 +215,7 @@ public class OrderCareService {
         mail.order(order, "REFUNDED", "退款已完成 / Refund completed.");
     }
 
-    @Scheduled(fixedDelay = 60000, initialDelay = 30000)
+    @Scheduled(fixedDelay = 60000, initialDelayString = "${shop.refunds.initial-delay-ms:30000}")
     public void processRefunds() {
         for (AfterSale candidate
                 : cases.findTop20ByStateAndNextAttemptBeforeOrderByIdAsc("PROCESSING", LocalDateTime.now())) {

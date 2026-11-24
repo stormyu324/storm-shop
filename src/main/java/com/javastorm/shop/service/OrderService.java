@@ -189,6 +189,26 @@ public class OrderService {
         return found;
     }
 
+    /** Record actual offline receipt without rolling back fulfillment progress. */
+    @Transactional
+    public CustomerOrder confirmOfflinePayment(Long orderId) {
+        CustomerOrder order = orders.findForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException("订单不存在"));
+        if (order.getPaymentSessionId() == null && order.getPaidAt() != null
+                && order.getStatus() != OrderStatus.CANCELLED && order.getStatus() != OrderStatus.REFUNDED) {
+            return order;
+        }
+        if (!order.canConfirmOfflinePayment()) {
+            throw new BusinessException("当前订单无法确认线下收款");
+        }
+        order.setPaidAt(LocalDateTime.now());
+        if (order.getStatus() == OrderStatus.PLACED) {
+            order.setStatus(OrderStatus.PAID);
+        }
+        mail.order(order, "PAID", "线下收款已确认 / Offline payment confirmed.");
+        return order;
+    }
+
     /** 取消未付款的订单并退回库存；返回订单里的商品，方便放回购物车。不是待付款状态时什么也不做。 */
     @Transactional
     public Map<Long, Integer> cancelUnpaid(String orderNo) {

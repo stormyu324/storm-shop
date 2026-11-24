@@ -36,7 +36,11 @@ public class OrderSubmissionGuard {
 
     private final Clock clock;
     private final RateLimiter limiter;
-    private final Map<String, Object> inFlight = new ConcurrentHashMap<>();
+    private static final class SubmissionLock {
+        private int users;
+    }
+
+    private final Map<String, SubmissionLock> inFlight = new ConcurrentHashMap<>();
     private final Map<String, Result> results = new LinkedHashMap<>(256, 0.75f, false) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<String, Result> eldest) {
@@ -67,7 +71,11 @@ public class OrderSubmissionGuard {
             return action.get();
         }
         String fullKey = clientId + "\n" + key;
-        Object lock = inFlight.computeIfAbsent(fullKey, k -> new Object());
+        SubmissionLock lock = inFlight.compute(fullKey, (ignored, existing) -> {
+            SubmissionLock shared = existing == null ? new SubmissionLock() : existing;
+            shared.users++;
+            return shared;
+        });
         try {
             synchronized (lock) {
                 Result previous = cached(fullKey);
@@ -86,7 +94,8 @@ public class OrderSubmissionGuard {
                 return value;
             }
         } finally {
-            inFlight.remove(fullKey, lock);
+            // Keep the same lock for requests that have registered but are still waiting.
+            inFlight.computeIfPresent(fullKey, (ignored, shared) -> --shared.users == 0 ? null : shared);
         }
     }
 

@@ -58,7 +58,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties = {"shop.mail.from=shop@example.invalid", "shop.demo-data=false"})
+@SpringBootTest(properties = {"shop.mail.from=shop@example.invalid", "shop.demo-data=false", "shop.refunds.initial-delay-ms=3600000"})
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class PhaseTwoTest {

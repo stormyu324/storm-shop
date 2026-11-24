@@ -193,6 +193,12 @@ public class CustomerOrder {
         return paidAt;
     }
 
+    public boolean canConfirmOfflinePayment() {
+        return paidAt == null && paymentSessionId == null
+                && (status == OrderStatus.PLACED || status == OrderStatus.SHIPPED
+                    || status == OrderStatus.COMPLETED);
+    }
+
     public void setPaidAt(LocalDateTime paidAt) {
         this.paidAt = paidAt;
     }

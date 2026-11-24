@@ -74,6 +74,12 @@ public class AdminOrderApi {
         return mapper.adminOrder(find(id));
     }
 
+    @PostMapping("/{id}/offline-payment")
+    @Operation(summary = "确认已收到线下付款")
+    public AdminOrder confirmOfflinePayment(@PathVariable Long id) {
+        return mapper.adminOrder(orderService.confirmOfflinePayment(id));
+    }
+
     private CustomerOrder find(Long id) {
         return orders.findById(id).orElseThrow(() -> new NotFoundException("订单不存在"));
     }

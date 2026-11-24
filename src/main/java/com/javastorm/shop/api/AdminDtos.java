@@ -103,7 +103,7 @@ public final class AdminDtos {
             String customerName, String phone, String country, String address, String note,
             List<OrderLine> items, LocalDateTime createdAt, LocalDateTime paidAt,
             String email, String carrier, String trackingNumber, String trackingUrl, LocalDateTime shippedAt,
-            BigDecimal discountAmount, String couponCode) {
+            BigDecimal discountAmount, String couponCode, boolean canConfirmOfflinePayment) {
     }
 
     public record StatusChange(@NotNull OrderStatus status) {

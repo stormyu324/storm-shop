@@ -138,7 +138,8 @@ class CodexFixesTest {
     }
 
     @Test
-    void offlineOrdersCountAsRevenueOnceShipped() {
+    @WithMockUser(roles = {"STAFF", "SUPPORT"})
+    void offlineOrdersCountAsRevenueOnlyAfterReceiptConfirmation() throws Exception {
         Cart cart = new Cart();
         cart.add(p.getId(), 3);
         var placed = orderService.placeOrder(cart, form(null), Currency.CNY);
@@ -148,6 +149,16 @@ class CodexFixesTest {
 
         orderService.changeStatus(placed.getId(), OrderStatus.SHIPPED);
         orderService.changeStatus(placed.getId(), OrderStatus.COMPLETED);
+        cny = report();
+        assertThat(cny.paidOrders()).isZero();
+        assertThat(cny.paid()).isEqualByComparingTo("0");
+        mvc.perform(post("/api/admin/orders/{id}/offline-payment", placed.getId()).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.canConfirmOfflinePayment").value(false));
+        var recordedAt = orders.findById(placed.getId()).orElseThrow().getPaidAt();
+        assertThat(recordedAt).isNotNull();
+        assertThat(orderService.confirmOfflinePayment(placed.getId()).getPaidAt()).isEqualTo(recordedAt);
         cny = report();
         assertThat(cny.paidOrders()).isEqualTo(1);
         assertThat(cny.paid()).isEqualByComparingTo("30.00");

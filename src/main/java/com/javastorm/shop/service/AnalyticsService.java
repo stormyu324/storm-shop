@@ -16,7 +16,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @Service
 public class AnalyticsService {
@@ -42,16 +41,8 @@ public class AnalyticsService {
             List<Daily> daily,
             List<TopProduct> topProducts) {}
 
-    /**
-      * 是否算作已收款：在线支付以付款时间为准；线下确认的订单（没有在线支付）发货、完成或退款后才算收款，
-      * 否则默认的人民币线下流程收入永远显示为 0。
-      */
-    static boolean received(CustomerOrder o) {
-        if (o.getPaidAt() != null) {
-            return true;
-        }
-        return o.getPaymentSessionId() == null
-                && Set.of(OrderStatus.SHIPPED, OrderStatus.COMPLETED, OrderStatus.REFUNDED).contains(o.getStatus());
+    static boolean received(CustomerOrder order) {
+        return order.getPaidAt() != null;
     }
 
     @Transactional(readOnly = true)
