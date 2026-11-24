@@ -229,6 +229,37 @@ public class OrderService {
         return items;
     }
 
+    /**
+     * 取消超时未收款的线下订单并退回库存（防止有人只下单不付款，把库存一直占着）。
+     * 只处理仍是“待处理”、没有付款时间、也没有进行中售后的订单；其他情况什么也不做。
+     * @return 是否真的取消了
+     */
+    @Transactional
+    public boolean cancelStaleOffline(Long orderId) {
+        CustomerOrder order = orders.findForUpdate(orderId).orElse(null);
+        if (order == null || order.getStatus() != OrderStatus.PLACED || order.getPaidAt() != null
+                || afterSales.findByOrderIdOrderByIdDesc(orderId).stream()
+                        .anyMatch(a -> !"REJECTED".equals(a.getState()))) {
+            return false;
+        }
+        for (OrderItem item : order.getItems()) {
+            if (item.getProductId() != null) {
+                products.restock(item.getProductId(), item.getQuantity());
+            }
+        }
+        coupons.release(order);
+        order.setStatus(OrderStatus.CANCELLED);
+        mail.order(order, "CANCELLED", "订单超时未付款，已自动取消 / Order cancelled: payment not received in time.");
+        return true;
+    }
+
+    @Transactional(readOnly = true)
+    public List<CustomerOrder> unpaidOfflineOlderThan(LocalDateTime before) {
+        return orders.findByStatusAndCreatedAtBefore(OrderStatus.PLACED, before).stream()
+                .filter(o -> o.getPaidAt() == null)
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public List<CustomerOrder> unpaidOlderThan(LocalDateTime before) {
         return orders.findByStatusAndCreatedAtBefore(OrderStatus.PENDING_PAYMENT, before);

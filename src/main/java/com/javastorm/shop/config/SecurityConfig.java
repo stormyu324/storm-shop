@@ -110,14 +110,18 @@ public class SecurityConfig {
     }
 
     /** 生产环境（prod）下拒绝用默认密码或过短的密码启动，开发环境只打印警告。 */
+    /** 默认密码或少于 8 位。 */
+    public static boolean isWeak(String password) {
+        return password == null || password.length() < 8 || DEFAULT_PASSWORD.equals(password);
+    }
+
     static void checkPassword(String password, boolean requireStrong) {
-        boolean weak = password == null || password.length() < 8 || DEFAULT_PASSWORD.equals(password);
-        if (!weak) {
+        if (!isWeak(password)) {
             return;
         }
         if (requireStrong) {
             throw new IllegalStateException("后台密码不安全：请用环境变量 ADMIN_PASSWORD 设置至少 8 位、且不是默认值的密码");
         }
-        log.warn("正在使用默认或过短的后台密码，上线前请设置环境变量 ADMIN_PASSWORD");
+        log.warn("正在使用默认或过短的后台密码，只能在本机登录后台；上线前请设置环境变量 ADMIN_PASSWORD");
     }
 }
