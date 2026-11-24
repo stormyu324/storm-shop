@@ -15,6 +15,7 @@ import org.springframework.util.StringUtils;
 import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
@@ -260,7 +261,7 @@ public class ProductImportService {
         String weight = value(record, columns, "重量(g)");
         if (StringUtils.hasText(weight)) {
             try {
-                weightGrams = new BigDecimal(weight).setScale(0, java.math.RoundingMode.HALF_UP).intValueExact();
+                weightGrams = new BigDecimal(weight).setScale(0, RoundingMode.HALF_UP).intValueExact();
             } catch (ArithmeticException | NumberFormatException e) {
                 throw new BusinessException("重量「" + weight + "」不是有效数字（单位：克）");
             }
@@ -298,7 +299,7 @@ public class ProductImportService {
 
     private static BigDecimal dimension(String text, String field) {
         BigDecimal v = decimal(text, field);
-        return v == null ? null : v.setScale(1, java.math.RoundingMode.HALF_UP);
+        return v == null ? null : v.setScale(1, RoundingMode.HALF_UP);
     }
 
     private static Map<String, String> resolveColumns(List<String> headerNames) {
@@ -323,16 +324,23 @@ public class ProductImportService {
         return record.get(column).trim();
     }
 
+    private static final BigDecimal MAX_AMOUNT = new BigDecimal("9999999999.99");
+
     private static BigDecimal decimal(String text, String field) {
         if (!StringUtils.hasText(text)) {
             return null;
         }
         try {
-            BigDecimal v = new BigDecimal(text.replace("¥", "").replace("￥", "").replace(",", "").trim());
+            String digits = text.replace("US$", "").replace("$", "").replace("¥", "").replace("￥", "").replace(",", "");
+            BigDecimal v = new BigDecimal(digits.trim()).setScale(2, RoundingMode.HALF_UP);
             if (v.signum() < 0) {
                 throw new BusinessException(field + "不能为负数");
             }
-            return v.setScale(2, java.math.RoundingMode.HALF_UP);
+            // 数据库金额列最多 10 位整数；超出时作为本行错误，而不是让整批导入在保存时失败
+            if (v.compareTo(MAX_AMOUNT) > 0) {
+                throw new BusinessException(field + "「" + text + "」过大");
+            }
+            return v;
         } catch (NumberFormatException e) {
             throw new BusinessException(field + "「" + text + "」不是有效数字");
         }

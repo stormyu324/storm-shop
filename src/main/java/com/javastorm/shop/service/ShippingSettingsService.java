@@ -26,14 +26,26 @@ public class ShippingSettingsService {
 
     /** 运费参数。 */
     public record Fees(BigDecimal baseFee, int includedGrams, BigDecimal extraPerKg, BigDecimal freeThreshold) {
-        void validate() {
+        /** requireBaseFee：这套运费会被用来计算时，首重运费必须填写（结算时按它计算）。 */
+        void validate(boolean requireBaseFee) {
+            if (requireBaseFee && baseFee == null) {
+                throw new BusinessException("请填写首重运费（不收运费填 0）");
+            }
             if (negative(baseFee) || negative(extraPerKg) || negative(freeThreshold) || includedGrams < 0) {
                 throw new BusinessException("运费和重量不能为负数");
+            }
+            if (tooLarge(baseFee) || tooLarge(extraPerKg) || tooLarge(freeThreshold)) {
+                throw new BusinessException("金额过大");
             }
         }
 
         private static boolean negative(BigDecimal v) {
             return v != null && v.signum() < 0;
+        }
+
+        /** 数据库金额列最多 10 位整数。 */
+        private static boolean tooLarge(BigDecimal v) {
+            return v != null && v.compareTo(new BigDecimal("9999999999.99")) > 0;
         }
     }
 
@@ -50,7 +62,7 @@ public class ShippingSettingsService {
     /** 保存默认规则（没有单独设置的国家都用它）。 */
     @Transactional
     public ShippingRule saveDefault(Currency currency, boolean enabled, boolean zonesOnly, Fees fees) {
-        fees.validate();
+        fees.validate(enabled);
         if (zonesOnly && zones.findByCurrencyOrderByIdAsc(currency).isEmpty()) {
             throw new BusinessException("还没有添加任何国家分组，不能设为“只配送到列出的国家”");
         }
@@ -77,7 +89,7 @@ public class ShippingSettingsService {
         if (codes.isEmpty()) {
             throw new BusinessException("请至少填写一个国家代码");
         }
-        fees.validate();
+        fees.validate(true);
         for (ShippingZone other : zones.findByCurrencyOrderByIdAsc(currency)) {
             if (other.getId().equals(id)) {
                 continue;

@@ -220,7 +220,7 @@ public class OrderService {
         for (OrderItem item : order.getItems()) {
             if (item.getProductId() != null) {
                 items.merge(item.getProductId(), item.getQuantity(), Integer::sum);
-                products.findById(item.getProductId()).ifPresent(p -> p.setStock(p.getStock() + item.getQuantity()));
+                products.restock(item.getProductId(), item.getQuantity());
             }
         }
         coupons.release(order);
@@ -263,8 +263,7 @@ public class OrderService {
             coupons.release(order);
             for (OrderItem item : order.getItems()) {
                 if (item.getProductId() != null) {
-                    products.findById(item.getProductId())
-                            .ifPresent(p -> p.setStock(p.getStock() + item.getQuantity()));
+                    products.restock(item.getProductId(), item.getQuantity());
                 }
             }
         }

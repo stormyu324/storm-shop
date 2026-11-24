@@ -55,9 +55,19 @@ public class OrderMailService {
     /** 订单通知的有效期：邮件服务长时间没配置或故障时，过期的旧通知不再补发。 */
     static final Duration ORDER_NOTICE_TTL = Duration.ofDays(3);
 
+    /** 订单通知；同一订单的同一事件只发一次。 */
     public void order(CustomerOrder order, String event, String detail) {
+        notice(order, order.getId() + ":" + event, event, detail);
+    }
+
+    /** 同一事件可以多次发生的通知（如修改物流单号），revision 区分每一次。 */
+    public void order(CustomerOrder order, String event, String revision, String detail) {
+        notice(order, order.getId() + ":" + event + ":" + revision, event, detail);
+    }
+
+    private void notice(CustomerOrder order, String key, String event, String detail) {
         enqueue(
-                order.getId() + ":" + event,
+                key,
                 order.getEmail(),
                 "Storm order " + order.getOrderNo() + " · " + event,
                 "Order / 订单 "

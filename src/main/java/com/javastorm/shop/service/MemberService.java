@@ -158,11 +158,14 @@ public class MemberService {
         saved.setPhone(phone.trim());
         saved.setCountry(country.toUpperCase(Locale.ROOT));
         saved.setAddress(address.trim());
-        saved.setPreferred(preferred && active);
         saved.setActive(active);
-        if (saved.isPreferred()) {
-            addresses(memberId).forEach(a -> a.setPreferred(false));
+        if (preferred && active) {
+            // 取消其他地址的默认标记；修改已有地址时列表里包含它自己，要跳过
+            addresses(memberId).stream()
+                    .filter(other -> !other.getId().equals(saved.getId()))
+                    .forEach(other -> other.setPreferred(false));
         }
+        saved.setPreferred(preferred && active);
         return addresses.save(saved);
     }
 

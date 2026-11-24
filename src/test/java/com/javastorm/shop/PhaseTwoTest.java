@@ -141,6 +141,11 @@ class PhaseTwoTest {
                 members.saveAddress(alice.getId(), null, "Alice", "12345678", "CN", "Address one", true, true);
         members.saveAddress(alice.getId(), null, "Alice", "12345678", "CN", "Address two", true, true);
         assertThat(members.addresses(alice.getId()).stream().filter(x -> x.isPreferred()).count()).isEqualTo(1);
+        // 修改已有地址设为默认：它成为唯一的默认地址
+        members.saveAddress(alice.getId(), a.getId(), "Alice", "12345678", "CN", "Address one", true, true);
+        assertThat(members.addresses(alice.getId()).stream().filter(x -> x.isPreferred()))
+                .singleElement()
+                .satisfies(x -> assertThat(x.getId()).isEqualTo(a.getId()));
         mvc.perform(
                         put("/api/member/addresses/" + a.getId())
                                 .session(session(bob))
