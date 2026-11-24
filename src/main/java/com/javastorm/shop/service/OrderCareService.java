@@ -17,6 +17,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.net.URI;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
 
@@ -176,7 +177,7 @@ public class OrderCareService {
                 a.setProviderFailed(false);
             }
             a.setAttempts(0);
-            a.setNextAttempt(LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS));
+            a.setNextAttempt(LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS));
         } else if ("CONFIRM_MANUAL".equals(action)) {
             if (!"MANUAL_REQUIRED".equals(a.getState()) || note == null || note.isBlank()) {
                 throw new BusinessException("请核实线下退款并填写退款凭据");

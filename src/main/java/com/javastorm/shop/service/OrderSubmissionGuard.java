@@ -34,12 +34,13 @@ public class OrderSubmissionGuard {
     private record Result(String fingerprint, Object value, Instant expires) {
     }
 
-    private final Clock clock;
-    private final RateLimiter limiter;
+    /** 同一下单标识共用的锁；users 记录还在使用它的请求数，减到 0 才移除，避免排队中的请求和新请求各拿一把锁。 */
     private static final class SubmissionLock {
         private int users;
     }
 
+    private final Clock clock;
+    private final RateLimiter limiter;
     private final Map<String, SubmissionLock> inFlight = new ConcurrentHashMap<>();
     private final Map<String, Result> results = new LinkedHashMap<>(256, 0.75f, false) {
         @Override
@@ -94,7 +95,7 @@ public class OrderSubmissionGuard {
                 return value;
             }
         } finally {
-            // Keep the same lock for requests that have registered but are still waiting.
+            // 还有请求在排队时保留同一把锁
             inFlight.computeIfPresent(fullKey, (ignored, shared) -> --shared.users == 0 ? null : shared);
         }
     }

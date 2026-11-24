@@ -56,8 +56,8 @@
               {{ actionLabel(s) }}
             </el-button>
             <el-button link type="primary" @click="care.open(row)">物流与售后</el-button>
-            <el-button v-if="row.canConfirmOfflinePayment" link type="success" @click="confirmReceipt(row)">确认收款</el-button>
-            <span v-if="!row.nextStatuses.length && !row.canConfirmOfflinePayment" class="muted small">—</span>
+            <el-button v-if="row.canConfirmOfflinePayment && can('ADMIN')" link type="success" @click="confirmReceipt(row)">确认收款</el-button>
+            <span v-if="!row.nextStatuses.length && !(row.canConfirmOfflinePayment && can('ADMIN'))" class="muted small">—</span>
           </template>
         </el-table-column>
       </el-table>
@@ -77,6 +77,7 @@ const care = ref(null)
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api, errorText } from '../api'
+import { can } from '../auth'
 import { dateTime, money, ORDER_STATUS } from '../format'
 
 const route = useRoute()
@@ -115,12 +116,16 @@ function onTab() {
 async function confirmReceipt(row) {
   try {
     await ElMessageBox.confirm('请核对订单金额和实际到账记录。确认已收到全额付款？', '确认线下收款', { type: 'warning' })
-  } catch { return }
+  } catch {
+    return
+  }
   try {
     await api.post('/api/admin/orders/' + row.id + '/offline-payment')
     ElMessage.success('已记录收款')
     await load()
-  } catch (e) { ElMessage.error(errorText(e)) }
+  } catch (e) {
+    ElMessage.error(errorText(e))
+  }
 }
 
 async function change(row, status) {

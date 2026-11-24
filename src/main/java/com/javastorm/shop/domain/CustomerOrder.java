@@ -193,10 +193,10 @@ public class CustomerOrder {
         return paidAt;
     }
 
+    /** 线下订单（没走在线支付）还没记录收款，且处于待处理、已发货或已完成时，可以由管理员确认收款。 */
     public boolean canConfirmOfflinePayment() {
         return paidAt == null && paymentSessionId == null
-                && (status == OrderStatus.PLACED || status == OrderStatus.SHIPPED
-                    || status == OrderStatus.COMPLETED);
+                && (status == OrderStatus.PLACED || status == OrderStatus.SHIPPED || status == OrderStatus.COMPLETED);
     }
 
     public void setPaidAt(LocalDateTime paidAt) {

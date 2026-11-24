@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -138,7 +139,7 @@ class CodexFixesTest {
     }
 
     @Test
-    @WithMockUser(roles = {"STAFF", "SUPPORT"})
+    @WithMockUser(roles = "ADMIN")
     void offlineOrdersCountAsRevenueOnlyAfterReceiptConfirmation() throws Exception {
         Cart cart = new Cart();
         cart.add(p.getId(), 3);
@@ -152,6 +153,9 @@ class CodexFixesTest {
         cny = report();
         assertThat(cny.paidOrders()).isZero();
         assertThat(cny.paid()).isEqualByComparingTo("0");
+        mvc.perform(post("/api/admin/orders/{id}/offline-payment", placed.getId()).with(csrf())
+                        .with(user("support").roles("STAFF", "SUPPORT")))
+                .andExpect(status().isForbidden());
         mvc.perform(post("/api/admin/orders/{id}/offline-payment", placed.getId()).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("COMPLETED"))

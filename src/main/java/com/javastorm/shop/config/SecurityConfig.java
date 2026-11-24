@@ -41,7 +41,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/admin/session").permitAll()
                         .requestMatchers("/api/admin/staff/**", "/api/admin/audit/**",
-                                "/api/admin/orders/*/after-sales/*").hasRole("ADMIN")
+                                "/api/admin/orders/*/after-sales/*", "/api/admin/orders/*/offline-payment")
+                        .hasRole("ADMIN")
                         .requestMatchers("/api/admin/orders/**").hasAnyRole("ADMIN", "SUPPORT")
                         .requestMatchers("/api/admin/coupons/**", "/api/admin/analytics/**").hasAnyRole("ADMIN", "OPERATIONS")
                         // 商品管理：商品、图片上传、分类、运费、AI 英文资料、平台导出

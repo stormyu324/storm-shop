@@ -189,7 +189,7 @@ public class OrderService {
         return found;
     }
 
-    /** Record actual offline receipt without rolling back fulfillment progress. */
+    /** 记录线下订单已收到付款：只补付款时间，已发货或已完成的订单状态不回退；重复确认时原样返回。 */
     @Transactional
     public CustomerOrder confirmOfflinePayment(Long orderId) {
         CustomerOrder order = orders.findForUpdate(orderId)
