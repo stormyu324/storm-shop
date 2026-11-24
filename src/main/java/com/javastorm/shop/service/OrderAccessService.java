@@ -24,7 +24,8 @@ public class OrderAccessService {
     private final OrderRepository orders;
     private final OrderMailService mail;
     private final SecureRandom random = new SecureRandom();
-    private final RateLimiter limiter = new RateLimiter(5, 1000, Clock.systemUTC());
+    // 只按来源 IP 限制（10 分钟 5 次），不设全站每日总数：否则少数人刷满后所有顾客当天都收不到验证码
+    private final RateLimiter limiter = new RateLimiter(5, Integer.MAX_VALUE, Clock.systemUTC());
 
     public OrderAccessService(
             OrderAccessRepository access, OrderRepository orders, OrderMailService mail) {
