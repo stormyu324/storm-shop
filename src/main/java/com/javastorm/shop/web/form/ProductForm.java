@@ -2,6 +2,7 @@ package com.javastorm.shop.web.form;
 
 import com.javastorm.shop.domain.Product;
 import com.javastorm.shop.domain.ProductStatus;
+import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -75,12 +76,15 @@ public class ProductForm {
     private Integer weightGrams;
 
     @DecimalMin(value = "0.0", message = "尺寸不能为负数")
+    @DecimalMax(value = "9999999.9", message = "尺寸不能超过 9999999.9 厘米")
     private BigDecimal lengthCm;
 
     @DecimalMin(value = "0.0", message = "尺寸不能为负数")
+    @DecimalMax(value = "9999999.9", message = "尺寸不能超过 9999999.9 厘米")
     private BigDecimal widthCm;
 
     @DecimalMin(value = "0.0", message = "尺寸不能为负数")
+    @DecimalMax(value = "9999999.9", message = "尺寸不能超过 9999999.9 厘米")
     private BigDecimal heightCm;
 
     @Pattern(regexp = "^$|^\\d{12,14}$", message = "条码应为 12 位 UPC、13 位 EAN 或 14 位 GTIN 数字")
