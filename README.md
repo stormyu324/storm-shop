@@ -29,7 +29,8 @@ git clone https://github.com/stormyu324/storm-shop.git
 
 ### 数据保存与备份
 
-数据都在项目文件夹里，不会上传到 GitHub，拉取新代码也不会覆盖：
+默认使用自带的数据库（H2），数据都在项目文件夹里，不会上传到 GitHub，拉取新代码也不会覆盖
+（换成 MySQL 后数据在 MySQL 里，见下一节）：
 
 | 内容 | 位置 |
 | --- | --- |
@@ -44,10 +45,44 @@ git clone https://github.com/stormyu324/storm-shop.git
 - `BACKUP_KEEP`：保留几份，`0` 表示全部保留
 
 `config.env` 里有密码和密钥，不会放进备份，请另外保存一份。
+换成 MySQL 后同一个脚本会改用 MySQL 自带的 `mysqldump` 导出（找不到时在 `config.env` 里用 `MYSQLDUMP` 指定路径）。
 用正式环境配置（`SPRING_PROFILES_ACTIVE=prod`）运行时，数据库不允许其他程序同时打开，需要先关掉商城再备份。
 
 **恢复**：关掉商城 → 把现有的 `data` 文件夹改名留底 → 新建 `data`，把备份里 `database.zip` 中的
-`shop.mv.db` 解压进去 → 用备份里的 `uploads` 覆盖原来的 → 重新启动。备份包里的“恢复说明.txt”有同样的步骤。
+`shop.mv.db` 解压进去 → 用备份里的 `uploads` 覆盖原来的 → 重新启动。备份包里的“恢复说明.txt”有同样的步骤
+（MySQL 备份的恢复步骤也写在里面）。
+
+### 换成 MySQL（可选）
+
+在自己电脑上用，自带数据库加定期备份就够了；放到服务器上长期营业时建议换成 MySQL（8.0 或更高版本）。
+
+1. **安装 MySQL**：Windows 用官方安装程序（dev.mysql.com/downloads/installer）；macOS 用 `brew install mysql`，
+   再 `brew services start mysql`。
+2. **建数据库和账号**：用 MySQL 命令行或 Workbench 以 root 登录，执行（密码换成你自己的）：
+
+   ```sql
+   CREATE DATABASE shop CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+   CREATE USER 'shop'@'localhost' IDENTIFIED BY '换成你的密码';
+   GRANT ALL PRIVILEGES ON shop.* TO 'shop'@'localhost';
+   ```
+
+   `utf8mb4` 才能正常保存中文和表情；`utf8mb4_bin` 和自带数据库一样区分大小写（SKU `abc-1` 和 `ABC-1` 是两个商品）。
+3. **在 `config.env` 里填三行**：
+
+   ```
+   DB_URL=jdbc:mysql://localhost:3306/shop
+   DB_USERNAME=shop
+   DB_PASSWORD=换成你的密码
+   ```
+
+4. **搬原来的数据**：关掉商城，双击 `migrate-to-mysql.bat`（macOS：`migrate-to-mysql.command`，Linux：`./migrate-to-mysql.sh`），
+   输入 `y` 回车。程序会建好 MySQL 的表、复制全部数据并核对行数，最后列出每张表的行数后自动停止。
+   - 只能迁移到**空**数据库，不会覆盖已有数据；出错时 MySQL 里不会留下数据。
+   - 原来的 `data` 文件夹只读取不修改，可以留作备份。
+   - 新开店、不需要原来的数据时跳过这一步，直接启动即可。
+5. **正常启动**：以后双击启动脚本就会使用 MySQL。
+
+想换回自带数据库：在 `config.env` 里把这三行前面加 `#` 即可（换回后看到的是迁移前的数据，在 MySQL 期间产生的新订单不在里面）。
 
 ### 配置文件
 
@@ -206,7 +241,9 @@ AI 只能推荐店里真实存在、正在销售的商品；同样的问题 10 �
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | `admin` / `admin123` | 后台账号，**上线前一定要修改密码** |
-| `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` | 本地 H2 文件 `./data/shop` | 换 MySQL/PostgreSQL 时修改，并在 `pom.xml` 加驱动 |
+| `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` | 本地 H2 文件 `./data/shop` | 换成 MySQL 时修改，见“换成 MySQL” |
+| `BACKUP_DIR` / `BACKUP_KEEP` | `./backups` / `30` | 一键备份的保存位置和保留份数 |
+| `MYSQLDUMP` | 自动查找 | 用 MySQL 时，备份用的 mysqldump 路径 |
 | `UPLOAD_DIR` | `./uploads` | 图片保存目录 |
 | `PORT` | `8080` | 端口 |
 | `DEMO_DATA` | `true` | 空库时是否写入示例数据 |
@@ -228,10 +265,16 @@ SPRING_PROFILES_ACTIVE=prod ADMIN_PASSWORD=你的强密码 java -jar target/shop
 
 - 后台密码必须至少 8 位且不是默认的 `admin123`，否则**拒绝启动**（开发模式只打印警告）
 - 不写入示例商品、开启模板缓存、不开放 H2 的 TCP 端口、错误页不显示异常细节
-- 正式运营建议通过 `DB_URL` 等变量换成 MySQL/PostgreSQL；数据库表结构目前由程序启动时自动更新
+- 正式运营建议换成 MySQL（见“换成 MySQL”）；数据库表结构由程序启动时自动创建和更新
 
 ## 测试
 
 ```bash
 ./mvnw test
+```
+
+默认用内存数据库。在 MySQL 上跑全部测试（先建一个空的 `shop_test` 库，建法同上）：
+
+```bash
+./mvnw test -Dspring.datasource.url=jdbc:mysql://localhost:3306/shop_test -Dspring.datasource.username=shop -Dspring.datasource.password=你的密码
 ```

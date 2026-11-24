@@ -24,7 +24,8 @@ public class OrderMail {
 
     private String subject;
 
-    @Column(length = 6000)
+    /** 长度见 Product.LONG_TEXT 的说明：MySQL 存成 TEXT。 */
+    @Column(length = Product.LONG_TEXT)
     private String body;
 
     private int attempts;

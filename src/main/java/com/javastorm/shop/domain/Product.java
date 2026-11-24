@@ -49,7 +49,13 @@ public class Product {
 
     private int stock;
 
-    @Column(length = 10000)
+    /**
+     * 长文本列的长度故意设为 MySQL VARCHAR 的上限以上，MySQL 会存成 TEXT（否则整行超过 65535 字节无法建表），
+     * H2 仍是 VARCHAR。实际字数上限由 ProductForm 和导入校验控制。
+     */
+    static final int LONG_TEXT = 65536;
+
+    @Column(length = LONG_TEXT)
     private String description;
 
     // ---------- 跨境 / 平台资料（均为可选） ----------
@@ -61,11 +67,11 @@ public class Product {
     @Column(length = 200)
     private String titleEn;
 
-    @Column(length = 10000)
+    @Column(length = LONG_TEXT)
     private String descriptionEn;
 
     /** 英文卖点，每行一条，最多 5 条。 */
-    @Column(length = 2500)
+    @Column(length = LONG_TEXT)
     private String bulletPointsEn;
 
     @Column(length = 100)
