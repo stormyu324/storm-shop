@@ -56,4 +56,13 @@ class LoginThrottleTest {
         t.recordFailure("1.1.1.1", "admin");
         assertThat(t.isBlocked("1.1.1.1", "admin")).isFalse();
     }
+
+    @Test
+    void capsTrackedKeysUnderRandomIpFlood() {
+        LoginThrottle t = new LoginThrottle(new MutableClock(), 10);
+        for (int i = 0; i < 30; i++) {
+            t.recordFailure("10.0.0." + i, "admin");
+        }
+        assertThat(t.trackedKeys()).isLessThanOrEqualTo(10);
+    }
 }

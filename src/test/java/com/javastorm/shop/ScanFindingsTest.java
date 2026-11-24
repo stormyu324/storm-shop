@@ -187,4 +187,18 @@ class ScanFindingsTest {
         // 停用的默认规则不会被用来计算，可以不填
         shippingSettings.saveDefault(Currency.USD, false, false, new Fees(null, 1000, null, null));
     }
+
+    @Test
+    void importReportsHugeDimensionsAsRowErrors() {
+        String sku = "DIM-" + System.nanoTime();
+        String csv = "名称,SKU,售价,长(cm),宽(cm),高(cm)\n"
+                + "正常尺寸," + sku + "-OK,35,30.5,20,10\n"
+                + "尺寸超限," + sku + "-BIG,35,10000000,20,10\n";
+
+        var result = importer.importCsv(csv.getBytes(StandardCharsets.UTF_8), ProductStatus.ON_SALE);
+
+        assertThat(result.created()).isEqualTo(1);
+        assertThat(result.errors()).singleElement().satisfies(e -> assertThat(e.message()).contains("过大"));
+        assertThat(products.findBySku(sku + "-OK")).isPresent();
+    }
 }

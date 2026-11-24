@@ -21,6 +21,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class OrderCareService {
@@ -132,8 +133,8 @@ public class OrderCareService {
             order.setShippedAt(LocalDateTime.now());
             mail.order(order, "SHIPPED", detail);
         } else if (changed) {
-            // 已发货后改了物流信息：再通知一次（重复保存相同内容不重发）
-            mail.order(order, "TRACKING_UPDATED", String.valueOf(System.currentTimeMillis()),
+            // 已发货后改了物流信息：再通知一次（重复保存相同内容不重发；用 UUID 避免同毫秒内多次修改碰撞）
+            mail.order(order, "TRACKING_UPDATED", UUID.randomUUID().toString(),
                     "物流信息已更新 / Tracking updated:\n" + detail);
         }
     }

@@ -297,9 +297,19 @@ public class ProductImportService {
         return java.util.Optional.of(v);
     }
 
+    private static final BigDecimal MAX_DIMENSION = new BigDecimal("9999999.9");
+
     private static BigDecimal dimension(String text, String field) {
         BigDecimal v = decimal(text, field);
-        return v == null ? null : v.setScale(1, RoundingMode.HALF_UP);
+        if (v == null) {
+            return null;
+        }
+        BigDecimal scaled = v.setScale(1, RoundingMode.HALF_UP);
+        // 数据库尺寸列为 DECIMAL(8, 1)，最多 7 位整数
+        if (scaled.compareTo(MAX_DIMENSION) > 0) {
+            throw new BusinessException(field + "「" + text + "」过大");
+        }
+        return scaled;
     }
 
     private static Map<String, String> resolveColumns(List<String> headerNames) {
