@@ -1,6 +1,7 @@
 target/
 data/
 uploads/
+backups/
 *.log
 .idea/
 *.iml

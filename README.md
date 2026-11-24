@@ -27,6 +27,28 @@ git clone https://github.com/stormyu324/storm-shop.git
 
 停止：关掉命令行窗口，或按 `Ctrl + C`。首次启动会自动写入几条示例商品（`DEMO_DATA=false` 可关闭）。
 
+### 数据保存与备份
+
+数据都在项目文件夹里，不会上传到 GitHub，拉取新代码也不会覆盖：
+
+| 内容 | 位置 |
+| --- | --- |
+| 商品、订单、分类、运费、优惠券、会员、员工账号、操作记录 | `data/shop.mv.db` |
+| 后台上传的商品图片 | `uploads/` |
+
+**一键备份**：Windows 双击 `backup.bat`，macOS 双击 `backup.command`（Linux：`./backup.sh`）。
+商城运行中也可以备份，不用先关掉。每次生成一个 `backups/storm-backup-日期-时间.zip`，
+里面有数据库、图片和恢复说明，默认只保留最近 30 份。在 `config.env` 里可以改：
+
+- `BACKUP_DIR`：备份保存位置，设成 OneDrive / iCloud / 百度网盘的同步文件夹，就自动有了异地备份
+- `BACKUP_KEEP`：保留几份，`0` 表示全部保留
+
+`config.env` 里有密码和密钥，不会放进备份，请另外保存一份。
+用正式环境配置（`SPRING_PROFILES_ACTIVE=prod`）运行时，数据库不允许其他程序同时打开，需要先关掉商城再备份。
+
+**恢复**：关掉商城 → 把现有的 `data` 文件夹改名留底 → 新建 `data`，把备份里 `database.zip` 中的
+`shop.mv.db` 解压进去 → 用备份里的 `uploads` 覆盖原来的 → 重新启动。备份包里的“恢复说明.txt”有同样的步骤。
+
 ### 配置文件
 
 把 `config.example.env` 复制一份，命名为 **`config.env`**，去掉需要的行前面的 `#` 填上值（后台密码、端口、AI 和 Stripe 的密钥等），启动脚本会自动读取。`config.env` 已加入 `.gitignore`，不会被提交。
