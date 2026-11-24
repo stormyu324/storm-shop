@@ -87,6 +87,11 @@ class AdminApiTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fields.name").value("请填写商品名称"))
                 .andExpect(jsonPath("$.fields.price").value("售价不能为负数"));
+        // 尺寸超过数据库列 DECIMAL(8, 1) 的范围：字段错误，而不是保存时报服务器错误
+        mvc.perform(post("/api/admin/products").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"超大箱子\",\"price\":10,\"stock\":1,\"status\":\"DRAFT\",\"lengthCm\":10000000}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fields.lengthCm").value("尺寸不能超过 9999999.9 厘米"));
 
         MvcResult created = mvc.perform(post("/api/admin/products").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"保温杯\",\"price\":89,\"stock\":20,\"status\":\"DRAFT\","

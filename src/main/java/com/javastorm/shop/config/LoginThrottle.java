@@ -8,7 +8,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
@@ -26,18 +26,31 @@ public class LoginThrottle {
     static final Duration WINDOW = Duration.ofMinutes(15);
     static final int PER_ACCOUNT = 5;
     static final int PER_ADDRESS = 30;
-    private static final int MAX_KEYS = 50_000;
+    static final int MAX_KEYS = 50_000;
 
     private final Clock clock;
-    private final Map<String, Deque<Instant>> failures = new HashMap<>();
+    private final int maxKeys;
+    private final Map<String, Deque<Instant>> failures;
 
     @Autowired
     public LoginThrottle() {
-        this(Clock.systemUTC());
+        this(Clock.systemUTC(), MAX_KEYS);
     }
 
     LoginThrottle(Clock clock) {
+        this(clock, MAX_KEYS);
+    }
+
+    LoginThrottle(Clock clock, int maxKeys) {
         this.clock = clock;
+        this.maxKeys = maxKeys;
+        // 按访问顺序淘汰最久未活跃的键，保证极端随机 IP 洪泛下内存严格有界且 O(1)
+        this.failures = new LinkedHashMap<>(256, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, Deque<Instant>> eldest) {
+                return size() > LoginThrottle.this.maxKeys;
+            }
+        };
     }
 
     /** 当前是否被暂停登录。 */
@@ -49,11 +62,12 @@ public class LoginThrottle {
 
     public synchronized void recordFailure(String address, String username) {
         Instant now = clock.instant();
-        if (failures.size() > MAX_KEYS) {
-            failures.values().removeIf(q -> q.isEmpty() || q.peekLast().isBefore(now.minus(WINDOW)));
-        }
         failures.computeIfAbsent(accountKey(address, username), k -> new ArrayDeque<>()).addLast(now);
         failures.computeIfAbsent(addressKey(address), k -> new ArrayDeque<>()).addLast(now);
+    }
+
+    synchronized int trackedKeys() {
+        return failures.size();
     }
 
     public synchronized void recordSuccess(String address, String username) {
