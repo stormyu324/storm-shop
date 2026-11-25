@@ -12,8 +12,10 @@ import com.anthropic.models.messages.StopReason;
 import com.anthropic.models.messages.StructuredMessage;
 import com.anthropic.models.messages.StructuredMessageCreateParams;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.javastorm.shop.config.ExternalCircuitBreakers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -72,11 +74,15 @@ public class ListingAiService {
 
     private final AnthropicClient client;
     private final String model;
+    private final ExternalCircuitBreakers breakers;
 
+    @Autowired
     public ListingAiService(@Value("${shop.ai.api-key:}") String apiKey,
                             @Value("${shop.ai.model:claude-opus-5-5}") String model,
-                            @Value("${shop.ai.base-url:}") String baseUrl) {
+                            @Value("${shop.ai.base-url:}") String baseUrl,
+                            ExternalCircuitBreakers breakers) {
         this.model = model;
+        this.breakers = breakers == null ? new ExternalCircuitBreakers() : breakers;
         if (StringUtils.hasText(apiKey)) {
             AnthropicOkHttpClient.Builder builder = AnthropicOkHttpClient.builder()
                     .apiKey(apiKey.trim())
@@ -88,6 +94,10 @@ public class ListingAiService {
         } else {
             this.client = null;
         }
+    }
+
+    public ListingAiService(String apiKey, String model, String baseUrl) {
+        this(apiKey, model, baseUrl, new ExternalCircuitBreakers());
     }
 
     public boolean isEnabled() {
@@ -108,20 +118,21 @@ public class ListingAiService {
                 .putAdditionalBodyProperty("fallbacks", JsonValue.from("default"))
                 .outputConfig(EnglishListing.class)
                 .build();
-        StructuredMessage<EnglishListing> response;
-        try {
-            response = client.messages().create(params);
-        } catch (UnauthorizedException e) {
-            throw new BusinessException("AI 调用失败：ANTHROPIC_API_KEY 无效，请检查后重启");
-        } catch (RateLimitException e) {
-            throw new BusinessException("AI 调用太频繁，请稍等一分钟再试");
-        } catch (AnthropicServiceException e) {
-            log.warn("Claude API 调用失败 status={}", e.statusCode(), e);
-            throw new BusinessException("AI 服务暂时不可用（" + e.statusCode() + "），请稍后再试");
-        } catch (AnthropicException e) {
-            log.warn("Claude API 调用失败", e);
-            throw new BusinessException("连接 AI 服务失败，请检查网络后再试");
-        }
+        StructuredMessage<EnglishListing> response = breakers.execute("claude", () -> {
+            try {
+                return client.messages().create(params);
+            } catch (UnauthorizedException e) {
+                throw new BusinessException("AI 调用失败：ANTHROPIC_API_KEY 无效，请检查后重启");
+            } catch (RateLimitException e) {
+                throw new BusinessException("AI 调用太频繁，请稍等一分钟再试");
+            } catch (AnthropicServiceException e) {
+                log.warn("Claude API 调用失败 status={}", e.statusCode(), e);
+                throw new BusinessException("AI 服务暂时不可用（" + e.statusCode() + "），请稍后再试");
+            } catch (AnthropicException e) {
+                log.warn("Claude API 调用失败", e);
+                throw new BusinessException("连接 AI 服务失败，请检查网络后再试");
+            }
+        }, "error.ai.unavailable", "AI 服务暂时不可用，请稍后再试");
         StopReason stop = response.stopReason().orElse(null);
         if (StopReason.REFUSAL.equals(stop)) {
             throw new BusinessException("AI 拒绝为这个商品生成内容，请手动填写");

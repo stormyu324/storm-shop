@@ -13,9 +13,10 @@ export async function loadSession() {
   return s
 }
 
-export async function login(username, password) {
+export async function login(username, password, totpCode) {
   if (!auth.loaded) await loadSession()
-  const s = await request('POST', '/api/admin/session', { username, password })
+  const headers = totpCode && totpCode.trim() ? { 'X-Admin-TOTP': totpCode.trim() } : {}
+  const s = await request('POST', '/api/admin/session', { username, password }, { headers })
   auth.authenticated = s.authenticated
   auth.username = s.username || ''
   auth.roles = s.roles || []

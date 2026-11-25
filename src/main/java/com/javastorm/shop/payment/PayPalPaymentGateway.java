@@ -2,11 +2,13 @@ package com.javastorm.shop.payment;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.javastorm.shop.config.ExternalCircuitBreakers;
 import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.service.BusinessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -50,16 +52,19 @@ public class PayPalPaymentGateway implements PaymentGateway {
     private final String apiBase;
     private final Set<Currency> currencies;
     private final HttpClient http;
+    private final ExternalCircuitBreakers breakers;
 
     private volatile String cachedToken;
     private volatile Instant tokenExpiresAt = Instant.EPOCH;
 
+    @Autowired
     public PayPalPaymentGateway(
             @Value("${shop.paypal.client-id:}") String clientId,
             @Value("${shop.paypal.client-secret:}") String clientSecret,
             @Value("${shop.paypal.sandbox:true}") boolean sandbox,
             @Value("${shop.paypal.currencies:USD}") String currencies,
-            @Value("${shop.paypal.api-base:}") String apiBase) {
+            @Value("${shop.paypal.api-base:}") String apiBase,
+            ExternalCircuitBreakers breakers) {
         this.clientId = clientId == null ? "" : clientId.trim();
         this.clientSecret = clientSecret == null ? "" : clientSecret.trim();
         if (StringUtils.hasText(apiBase)) {
@@ -73,6 +78,11 @@ public class PayPalPaymentGateway implements PaymentGateway {
                 .map(c -> Currency.valueOf(c.toUpperCase(Locale.ROOT)))
                 .collect(Collectors.toUnmodifiableSet());
         this.http = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
+        this.breakers = breakers == null ? new ExternalCircuitBreakers() : breakers;
+    }
+
+    public PayPalPaymentGateway(String clientId, String clientSecret, boolean sandbox, String currencies, String apiBase) {
+        this(clientId, clientSecret, sandbox, currencies, apiBase, new ExternalCircuitBreakers());
     }
 
     @Override
@@ -223,20 +233,22 @@ public class PayPalPaymentGateway implements PaymentGateway {
     }
 
     private JsonNode send(HttpRequest req) {
-        try {
-            HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (res.statusCode() < 200 || res.statusCode() >= 300) {
-                log.warn("PayPal API 调用失败 status={} uri={} body={}", res.statusCode(), req.uri(), res.body());
+        return breakers.execute("paypal", () -> {
+            try {
+                HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                if (res.statusCode() < 200 || res.statusCode() >= 300) {
+                    log.warn("PayPal API 调用失败 status={} uri={} body={}", res.statusCode(), req.uri(), res.body());
+                    throw new BusinessException("error.payment.unavailable", "PayPal 支付服务暂时不可用，请稍后再试");
+                }
+                return JSON.readTree(res.body());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new BusinessException("error.payment.unavailable", "PayPal 支付请求被中断");
+            } catch (IOException e) {
+                log.warn("PayPal 网络异常 uri={}", req.uri(), e);
                 throw new BusinessException("error.payment.unavailable", "PayPal 支付服务暂时不可用，请稍后再试");
             }
-            return JSON.readTree(res.body());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new BusinessException("error.payment.unavailable", "PayPal 支付请求被中断");
-        } catch (IOException e) {
-            log.warn("PayPal 网络异常 uri={}", req.uri(), e);
-            throw new BusinessException("error.payment.unavailable", "PayPal 支付服务暂时不可用，请稍后再试");
-        }
+        }, "error.payment.unavailable", "PayPal 支付服务暂时不可用，请稍后再试");
     }
 
     private void requireEnabled() {
