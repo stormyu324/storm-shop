@@ -9,6 +9,7 @@ import com.javastorm.shop.repository.AfterSaleHistoryRepository;
 import com.javastorm.shop.repository.AfterSaleRepository;
 import com.javastorm.shop.repository.OrderRepository;
 import com.javastorm.shop.repository.ProductRepository;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -235,6 +236,7 @@ public class OrderCareService {
      * 再在事务外调用 Stripe，最后重新加锁记录结果。Stripe 有幂等键，重复请求不会重复退款。
      */
     @Scheduled(fixedDelay = 60000, initialDelayString = "${shop.refunds.initial-delay-ms:30000}")
+    @SchedulerLock(name = "after_sale_process_refunds", lockAtMostFor = "PT5M")
     public void processRefunds() {
         for (AfterSale candidate
                 : cases.findTop20ByStateAndNextAttemptBeforeOrderByIdAsc("PROCESSING", LocalDateTime.now())) {

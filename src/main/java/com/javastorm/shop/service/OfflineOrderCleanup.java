@@ -1,6 +1,7 @@
 package com.javastorm.shop.service;
 
 import com.javastorm.shop.domain.CustomerOrder;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +29,7 @@ public class OfflineOrderCleanup {
     }
 
     @Scheduled(fixedDelayString = "PT30M", initialDelayString = "${shop.offline-orders.initial-delay:PT5M}")
+    @SchedulerLock(name = "offline_order_cleanup", lockAtMostFor = "PT25M")
     public void cancelStale() {
         if (cancelAfterHours <= 0) {
             return;

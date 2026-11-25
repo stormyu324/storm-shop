@@ -14,7 +14,7 @@ import java.util.Optional;
 public interface OrderMailRepository extends JpaRepository<OrderMail, Long> {
     boolean existsByEventKey(String eventKey);
 
-    List<OrderMail> findTop20BySentAtIsNullAndNextAttemptBeforeAndAttemptsLessThanOrderByIdAsc(
+    List<OrderMail> findTop100BySentAtIsNullAndNextAttemptBeforeAndAttemptsLessThanOrderByIdAsc(
             LocalDateTime now, int attempts);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

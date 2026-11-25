@@ -13,6 +13,8 @@ import java.util.Map;
 @SessionScope
 public class Cart implements Serializable {
 
+    private static final long serialVersionUID = 1L;
+
     public static final int MAX_QUANTITY = 99;
 
     private final Map<Long, Integer> items = new LinkedHashMap<>();

@@ -193,7 +193,7 @@ public class StoreApiController {
         String requestKey = key == null ? "auto:" + fingerprint : "key:" + key;
         Duration ttl = key == null ? OrderSubmissionGuard.AUTO_TTL : OrderSubmissionGuard.KEY_TTL;
         return submissions.submit(clientId, http.getRemoteAddr(), requestKey, fingerprint, ttl,
-                () -> createOrder(req, cur, existing));
+                OrderCreated.class, () -> createOrder(req, cur, existing));
     }
 
     private OrderCreated createOrder(OrderRequest req, Currency cur, HttpSession session) {

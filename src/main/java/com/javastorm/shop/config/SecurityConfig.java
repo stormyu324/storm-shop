@@ -74,8 +74,12 @@ public class SecurityConfig {
     @Order(2)
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         // 网页部分：商城前台全部公开；/admin 是后台的 Vue 页面（本身公开，数据都走需要登录的 /api/admin 接口）
+        // /actuator/health 供负载均衡/K8s 探针访问；其余 /actuator/**（如 prometheus 指标）仅允许管理员访问
         http
-                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers("/actuator/**").hasRole("ADMIN")
+                        .anyRequest().permitAll())
                 // Stripe 服务器的通知没有 CSRF token，靠签名校验
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/stripe/webhook"));
         return http.build();
