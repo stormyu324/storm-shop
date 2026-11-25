@@ -4,6 +4,7 @@ import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.OrderStatus;
 import com.javastorm.shop.repository.OrderRepository;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +46,7 @@ public class AnalyticsService {
         return order.getPaidAt() != null;
     }
 
+    @Cacheable(value = "analytics", key = "#start + ':' + #end")
     @Transactional(readOnly = true)
     public List<Summary> report(LocalDate start, LocalDate end) {
         if (start == null

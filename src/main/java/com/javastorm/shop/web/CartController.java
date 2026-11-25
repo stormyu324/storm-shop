@@ -6,7 +6,7 @@ import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.OrderStatus;
 import com.javastorm.shop.domain.Product;
 import com.javastorm.shop.payment.PaymentFlow;
-import com.javastorm.shop.payment.StripePaymentService;
+import com.javastorm.shop.payment.PaymentGatewayRegistry;
 import com.javastorm.shop.repository.ProductRepository;
 import com.javastorm.shop.service.BusinessException;
 import com.javastorm.shop.service.Cart;
@@ -48,7 +48,7 @@ public class CartController {
     private final ProductRepository products;
     private final MessageSource messages;
     private final GlobalModelAdvice advice;
-    private final StripePaymentService stripe;
+    private final PaymentGatewayRegistry gateways;
     private final PaymentFlow paymentFlow;
     private final SiteUrls siteUrls;
     private final OrderPlacer orderPlacer;
@@ -58,7 +58,7 @@ public class CartController {
     private final MemberService members;
 
     public CartController(Cart cart, OrderService orderService, ProductRepository products,
-                          MessageSource messages, GlobalModelAdvice advice, StripePaymentService stripe,
+                          MessageSource messages, GlobalModelAdvice advice, PaymentGatewayRegistry gateways,
                           PaymentFlow paymentFlow, SiteUrls siteUrls, OrderPlacer orderPlacer,
                           HttpSession session, Pricing pricing, CouponService coupons, MemberService members) {
         this.coupons = coupons;
@@ -72,7 +72,7 @@ public class CartController {
         this.products = products;
         this.messages = messages;
         this.advice = advice;
-        this.stripe = stripe;
+        this.gateways = gateways;
         this.paymentFlow = paymentFlow;
     }
 
@@ -186,10 +186,10 @@ public class CartController {
                 form.setEmail(member.getEmail());
             }
             Currency currency = LocaleConfig.currentCurrency();
-            boolean online = stripe.isEnabledFor(currency);
+            boolean online = gateways.anyEnabledFor(currency);
             CustomerOrder order = orderPlacer.place(cart, form, currency, online);
             if (online && order.getStatus() == OrderStatus.PENDING_PAYMENT) {
-                String url = paymentFlow.startPayment(order, cart, siteUrls.baseUrl(), LocaleConfig.isEnglish());
+                String url = paymentFlow.startPayment(order, cart, siteUrls.baseUrl(), LocaleConfig.isEnglish(), form.getPaymentProvider());
                 httpSession.setAttribute(PaymentController.PENDING_ORDER, order.getOrderNo());
                 return "redirect:" + url;
             }

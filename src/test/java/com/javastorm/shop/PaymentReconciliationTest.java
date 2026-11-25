@@ -69,6 +69,7 @@ class PaymentReconciliationTest {
         reconciliationRepo.deleteAll();
         orders.deleteAll();
         when(stripe.isEnabled()).thenReturn(true);
+        when(stripe.isEnabledFor(Currency.USD)).thenReturn(true);
 
         Product p = new Product();
         p.setName("对账测试商品");

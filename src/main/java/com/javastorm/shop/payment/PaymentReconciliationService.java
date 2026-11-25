@@ -44,36 +44,45 @@ public class PaymentReconciliationService {
 
     private final OrderRepository orders;
     private final OrderService orderService;
-    private final StripePaymentService stripe;
+    private final PaymentGatewayRegistry gateways;
     private final PaymentReconciliationRepository issues;
 
     public PaymentReconciliationService(OrderRepository orders, OrderService orderService,
-                                        StripePaymentService stripe, PaymentReconciliationRepository issues) {
+                                        PaymentGatewayRegistry gateways, PaymentReconciliationRepository issues) {
         this.orders = orders;
         this.orderService = orderService;
-        this.stripe = stripe;
+        this.gateways = gateways;
         this.issues = issues;
     }
 
     public record Summary(LocalDate date, int checkedOrders, int matched, int autoRecovered, int discrepancies) {
     }
 
-    /** 每日凌晨 02:15 自动核对前一日所有 Stripe 订单，集群通过 ShedLock 保证仅执行一次。 */
+    /** 每日凌晨 02:15 自动核对前一日所有在线支付订单（Stripe / PayPal），集群通过 ShedLock 保证仅执行一次。 */
     @Scheduled(cron = "${shop.reconciliation.cron:0 15 2 * * *}")
     @SchedulerLock(name = "stripe_daily_reconciliation", lockAtMostFor = "PT30M")
     public void reconcileYesterday() {
-        if (!stripe.isEnabled()) {
+        if (!anyGatewayEnabled()) {
             return;
         }
         Summary summary = reconcileDate(LocalDate.now().minusDays(1));
-        log.info("Stripe 每日对账完成 date={} checked={} matched={} autoRecovered={} discrepancies={}",
+        log.info("每日支付对账完成 date={} checked={} matched={} autoRecovered={} discrepancies={}",
                 summary.date(), summary.checkedOrders(), summary.matched(),
                 summary.autoRecovered(), summary.discrepancies());
     }
 
+    private boolean anyGatewayEnabled() {
+        for (var c : com.javastorm.shop.domain.Currency.values()) {
+            if (gateways.anyEnabledFor(c)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public Summary reconcileDate(LocalDate date) {
-        if (!stripe.isEnabled()) {
-            throw new BusinessException("Stripe 在线支付未启用，无法执行对账");
+        if (!anyGatewayEnabled()) {
+            throw new BusinessException("在线支付未启用，无法执行对账");
         }
         LocalDateTime start = date.atStartOfDay();
         LocalDateTime end = date.plusDays(1).atStartOfDay();
@@ -88,11 +97,13 @@ public class PaymentReconciliationService {
         List<PaymentReconciliationIssue> created = new ArrayList<>();
 
         for (CustomerOrder order : onlineOrders) {
-            SessionState state;
+            PaymentGateway.GatewaySessionState state;
             try {
-                state = stripe.retrieve(order.getPaymentSessionId());
+                PaymentGateway gateway = gateways.forSession(order.getPaymentSessionId())
+                        .orElseThrow(() -> new BusinessException("未找到对应支付通道"));
+                state = gateway.retrieveOrCapture(order.getPaymentSessionId());
                 if (state == null) {
-                    throw new BusinessException("Stripe 未返回会话状态");
+                    throw new BusinessException("支付平台未返回会话状态");
                 }
             } catch (RuntimeException e) {
                 discrepancies++;

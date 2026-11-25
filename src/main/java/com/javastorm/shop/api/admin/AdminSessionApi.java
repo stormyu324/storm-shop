@@ -5,6 +5,7 @@ import com.javastorm.shop.api.AdminDtos.SessionInfo;
 import com.javastorm.shop.api.ApiError;
 import com.javastorm.shop.config.LoginThrottle;
 import com.javastorm.shop.config.SecurityConfig;
+import com.javastorm.shop.config.TotpVerifier;
 import com.javastorm.shop.repository.StaffRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,9 +31,11 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
@@ -47,16 +50,19 @@ public class AdminSessionApi {
     private final LoginThrottle throttle;
     private final String ownerUsername;
     private final boolean ownerPasswordWeak;
+    private final String ownerTotpSecret;
     private final SecurityContextRepository contextRepository = new HttpSessionSecurityContextRepository();
 
     public AdminSessionApi(UserDetailsService users, PasswordEncoder encoder, StaffRepository staff,
                            LoginThrottle throttle,
                            @Value("${shop.admin.username}") String ownerUsername,
-                           @Value("${shop.admin.password}") String ownerPassword) {
+                           @Value("${shop.admin.password}") String ownerPassword,
+                           @Value("${shop.admin.totp-secret:}") String ownerTotpSecret) {
         this.staff = staff;
         this.throttle = throttle;
         this.ownerUsername = ownerUsername;
         this.ownerPasswordWeak = SecurityConfig.isWeak(ownerPassword);
+        this.ownerTotpSecret = ownerTotpSecret == null ? "" : ownerTotpSecret.trim();
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(users);
         provider.setPasswordEncoder(encoder);
@@ -70,8 +76,10 @@ public class AdminSessionApi {
     }
 
     @PostMapping
-    @Operation(summary = "登录", description = "需要请求头 X-XSRF-TOKEN；成功后登录状态保存在 Cookie 会话里")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req, CsrfToken csrf,
+    @Operation(summary = "登录", description = "需要请求头 X-XSRF-TOKEN；开启 ADMIN_TOTP_SECRET 时管理员登录还需请求头 X-Admin-TOTP")
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req,
+                                   @RequestHeader(value = "X-Admin-TOTP", required = false) String totpCode,
+                                   CsrfToken csrf,
                                    HttpServletRequest request, HttpServletResponse response) {
         String address = request.getRemoteAddr();
         if (throttle.isBlocked(address, req.username())) {
@@ -83,6 +91,11 @@ public class AdminSessionApi {
         } catch (AuthenticationException e) {
             throttle.recordFailure(address, req.username());
             return ResponseEntity.status(401).body(ApiError.of("用户名或密码错误"));
+        }
+        if (!ownerTotpSecret.isBlank() && ownerUsername.equals(auth.getName())
+                && !TotpVerifier.verify(ownerTotpSecret, totpCode, Instant.now())) {
+            throttle.recordFailure(address, req.username());
+            return ResponseEntity.status(401).body(ApiError.of("双因素动态验证码无效或缺失（请提供请求头 X-Admin-TOTP）"));
         }
         throttle.recordSuccess(address, req.username());
         // 店主账号还在用默认 / 过短密码时，只允许在本机登录，防止忘了改密码就直接放到服务器上

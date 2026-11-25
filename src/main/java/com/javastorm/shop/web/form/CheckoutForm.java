@@ -34,6 +34,10 @@ public class CheckoutForm {
     @Size(max = 40)
     private String couponCode;
 
+    /** 在线支付通道（stripe / paypal），为空时自动选默认已启用通道。 */
+    @Size(max = 20)
+    private String paymentProvider;
+
     /** 寄往国家 / 地区，ISO 两位代码。 */
     @NotBlank(message = "{checkout.country.required}")
     @Pattern(regexp = "^[A-Za-z]{2}$", message = "{checkout.country.required}")
@@ -85,5 +89,13 @@ public class CheckoutForm {
 
     public void setCouponCode(String couponCode) {
         this.couponCode = couponCode;
+    }
+
+    public String getPaymentProvider() {
+        return paymentProvider;
+    }
+
+    public void setPaymentProvider(String paymentProvider) {
+        this.paymentProvider = paymentProvider == null || paymentProvider.isBlank() ? null : paymentProvider.trim().toLowerCase(Locale.ROOT);
     }
 }
