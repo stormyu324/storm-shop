@@ -6,6 +6,7 @@ import com.javastorm.shop.payment.StripePaymentService.SessionState;
 import com.javastorm.shop.service.BusinessException;
 import com.javastorm.shop.service.Cart;
 import com.javastorm.shop.service.OrderService;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -28,17 +29,25 @@ public class PaymentFlow {
     static final long STALE_AFTER_MINUTES = 45;
 
     private final StripePaymentService stripe;
+    private final PaymentGatewayRegistry gateways;
     private final OrderService orders;
 
-    public PaymentFlow(StripePaymentService stripe, OrderService orders) {
+    public PaymentFlow(StripePaymentService stripe, PaymentGatewayRegistry gateways, OrderService orders) {
         this.stripe = stripe;
+        this.gateways = gateways;
         this.orders = orders;
     }
 
-    /** 为刚创建的待付款订单打开 Stripe 付款页；失败时取消订单、退回库存，并把商品放回购物车。 */
+    /** 为刚创建的待付款订单打开默认支付通道（Stripe 优先）；失败时取消订单、退回库存，并把商品放回购物车。 */
     public String startPayment(CustomerOrder order, Cart cart, String baseUrl, boolean english) {
+        return startPayment(order, cart, baseUrl, english, null);
+    }
+
+    /** 为刚创建的待付款订单打开指定支付通道（stripe / paypal）；失败时取消订单并恢复购物车。 */
+    public String startPayment(CustomerOrder order, Cart cart, String baseUrl, boolean english, String provider) {
         try {
-            StripePaymentService.Checkout checkout = stripe.createCheckout(order, baseUrl, english);
+            PaymentGateway gateway = gateways.resolve(provider, order.getCurrency());
+            PaymentGateway.CheckoutResult checkout = gateway.createCheckout(order, baseUrl, english);
             orders.attachPaymentSession(order.getId(), checkout.sessionId());
             return checkout.url();
         } catch (BusinessException e) {
@@ -47,9 +56,11 @@ public class PaymentFlow {
         }
     }
 
-    /** 顾客付款后跳回本站：向 Stripe 确认付款结果。 */
+    /** 顾客付款后跳回本站：按会话前缀路由至对应支付网关确认（PayPal 同步完成扣款捕获）。 */
     public Optional<PaidResult> confirmReturn(String sessionId) {
-        SessionState state = stripe.retrieve(sessionId);
+        PaymentGateway gateway = gateways.forSession(sessionId)
+                .orElseThrow(() -> new BusinessException("无法识别的支付会话"));
+        PaymentGateway.GatewaySessionState state = gateway.retrieveOrCapture(sessionId);
         if (state.orderNo() == null) {
             return Optional.empty();
         }
@@ -121,6 +132,7 @@ public class PaymentFlow {
 
     /** 兜底：webhook 没配置或没送达时，定时检查超时未付款的订单。 */
     @Scheduled(fixedDelayString = "PT10M", initialDelayString = "PT1M")
+    @SchedulerLock(name = "stripe_cleanup_stale_orders", lockAtMostFor = "PT9M")
     public void cleanupStaleOrders() {
         if (!stripe.isEnabled()) {
             return;

@@ -9,6 +9,8 @@ import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.OrderStatus;
 import com.javastorm.shop.payment.PaymentFlow;
 import com.javastorm.shop.repository.OrderRepository;
+import com.javastorm.shop.service.OrderFulfillmentService;
+import com.javastorm.shop.service.OrderFulfillmentService.BulkShipResult;
 import com.javastorm.shop.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -17,6 +19,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,6 +28,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/admin/orders")
@@ -33,12 +40,15 @@ public class AdminOrderApi {
 
     private final OrderRepository orders;
     private final OrderService orderService;
+    private final OrderFulfillmentService fulfillment;
     private final PaymentFlow paymentFlow;
     private final ApiMapper mapper;
 
-    public AdminOrderApi(OrderRepository orders, OrderService orderService, PaymentFlow paymentFlow, ApiMapper mapper) {
+    public AdminOrderApi(OrderRepository orders, OrderService orderService, OrderFulfillmentService fulfillment,
+                         PaymentFlow paymentFlow, ApiMapper mapper) {
         this.orders = orders;
         this.orderService = orderService;
+        this.fulfillment = fulfillment;
         this.paymentFlow = paymentFlow;
         this.mapper = mapper;
     }
@@ -78,6 +88,27 @@ public class AdminOrderApi {
     @Operation(summary = "确认已收到线下付款")
     public AdminOrder confirmOfflinePayment(@PathVariable Long id) {
         return mapper.adminOrder(orderService.confirmOfflinePayment(id));
+    }
+
+    @GetMapping("/fulfillment/export")
+    @Operation(summary = "导出待发货订单 CSV", description = "供仓库/ERP 批量打单；默认导出所有待发货订单（待处理 + 已付款），最多 5000 条")
+    public ResponseEntity<byte[]> exportForFulfillment(@RequestParam(required = false) OrderStatus status,
+                                                       @RequestParam(defaultValue = "true") boolean toFulfil,
+                                                       @RequestParam(defaultValue = "2000") int limit) {
+        byte[] csv = fulfillment.exportOrdersCsv(status, toFulfil, limit);
+        return Csv.download("orders-fulfillment-" + LocalDate.now() + ".csv", csv);
+    }
+
+    @GetMapping("/fulfillment/template")
+    @Operation(summary = "下载批量发货 CSV 模板")
+    public ResponseEntity<byte[]> shipmentTemplate() {
+        return Csv.download("shipments-template.csv", fulfillment.shipmentTemplateCsv());
+    }
+
+    @PostMapping("/fulfillment/import")
+    @Operation(summary = "批量导入物流单号并发货", description = "上传 CSV 批量填写承运商、运单号并标记已发货、发送发货通知邮件；单行失败不影响其余订单")
+    public BulkShipResult importShipments(@RequestParam("file") MultipartFile file) throws IOException {
+        return fulfillment.importShipmentsCsv(file.getBytes());
     }
 
     private CustomerOrder find(Long id) {
