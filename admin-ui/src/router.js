@@ -22,6 +22,7 @@ const router = createRouter({
         { path: 'coupons', component: () => import('./views/Coupons.vue'), meta: { title: '优惠券', role: 'OPERATIONS' } },
         { path: 'analytics', component: () => import('./views/Analytics.vue'), meta: { title: '运营数据', role: 'OPERATIONS' } },
         { path: 'staff', component: () => import('./views/Staff.vue'), meta: { title: '员工权限', role: 'ADMIN' } },
+        { path: 'reconciliation', component: () => import('./views/Reconciliation.vue'), meta: { title: '支付对账', role: 'ADMIN' } },
         { path: 'audit', component: () => import('./views/Audit.vue'), meta: { title: '操作记录', role: 'ADMIN' } },
         // 旧版后台的地址，收藏夹里的链接继续可用
         { path: 'products/:id/edit', redirect: to => `/products/${to.params.id}` },
