@@ -8,6 +8,7 @@ import com.javastorm.shop.repository.ProductRepository;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -86,6 +87,8 @@ public class ProductImportService {
      * @param bytes         CSV 文件内容，自动识别 UTF-8 / GBK 编码
      * @param defaultStatus 行内未填写“状态”时使用的状态
      */
+    // 导入时可能顺带新建分类，导入后清掉分类缓存，否则开启 Redis 时新分类要等缓存过期（10 分钟）才出现
+    @CacheEvict(value = "categories", allEntries = true)
     @Transactional
     public ImportResult importCsv(byte[] bytes, ProductStatus defaultStatus) {
         String text = decode(bytes);

@@ -5,6 +5,10 @@
 #   ADMIN_PASSWORD / MYSQL_PASSWORD / MYSQL_ROOT_PASSWORD / S3_* / STRIPE_*
 # 启动命令：
 #   docker compose -f docker-compose.cluster.yml up -d --build
+#
+# 商品图片：默认 STORAGE_TYPE=local，两个节点共用同一个 uploads-data 卷（只适用于两个节点在同一台机器上）；
+# 节点分布在多台服务器上时，请改用 STORAGE_TYPE=s3 对接对象存储。
+# Redis 密码：设置 REDIS_PASSWORD 后 Redis 服务端和应用同时启用该密码；不设置时 Redis 无密码，仅在 Docker 内部网络可访问。
 
 x-shop-env: &shop-env
   SPRING_PROFILES_ACTIVE: prod
@@ -20,6 +24,7 @@ x-shop-env: &shop-env
   REDIS_PORT: "6379"
   REDIS_PASSWORD: ${REDIS_PASSWORD:-}
   STORAGE_TYPE: ${STORAGE_TYPE:-local}
+  UPLOAD_DIR: /app/uploads
   S3_ENDPOINT: ${S3_ENDPOINT:-}
   S3_REGION: ${S3_REGION:-auto}
   S3_BUCKET: ${S3_BUCKET:-}
@@ -49,6 +54,8 @@ services:
     build: .
     restart: unless-stopped
     environment: *shop-env
+    volumes:
+      - uploads-data:/app/uploads
     depends_on:
       mysql:
         condition: service_healthy
@@ -59,6 +66,8 @@ services:
     build: .
     restart: unless-stopped
     environment: *shop-env
+    volumes:
+      - uploads-data:/app/uploads
     depends_on:
       mysql:
         condition: service_healthy
@@ -85,11 +94,17 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    # 设置了 REDIS_PASSWORD 时才加 --requirepass（$$ 让变量留给容器里的 shell 展开）
+    command:
+      - sh
+      - -c
+      - exec redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru $${REDIS_PASSWORD:+--requirepass "$$REDIS_PASSWORD"}
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli $${REDIS_PASSWORD:+-a \"$$REDIS_PASSWORD\" --no-auth-warning} ping | grep -q PONG"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -97,3 +112,4 @@ services:
 volumes:
   mysql-data:
   redis-data:
+  uploads-data:

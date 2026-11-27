@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -78,20 +79,20 @@ public class OrderFulfillmentService {
                             .map(this::formatItem)
                             .collect(Collectors.joining(" | "));
                     csv.printRecord(
-                            safe(o.getOrderNo()),
+                            excelText(o.getOrderNo()),
                             o.getStatus().name(),
                             o.getCreatedAt() == null ? "" : o.getCreatedAt().format(TIME_FORMAT),
                             o.getCurrency() == null ? "CNY" : o.getCurrency().name(),
                             o.getTotal() == null ? "0.00" : o.getTotal().toPlainString(),
                             safe(o.getCustomerName()),
-                            safe(o.getPhone()),
+                            excelText(o.getPhone()),
                             safe(o.getEmail()),
                             safe(o.getCountry()),
                             safe(o.getAddress()),
                             safe(o.getNote()),
                             safe(itemsSummary),
                             safe(o.getCarrier()),
-                            safe(o.getTrackingNumber()),
+                            excelText(o.getTrackingNumber()),
                             safe(o.getTrackingUrl())
                     );
                 }
@@ -109,7 +110,8 @@ public class OrderFulfillmentService {
                  CSVPrinter csv = new CSVPrinter(writer, CSVFormat.DEFAULT.builder()
                          .setHeader("订单号", "承运商", "运单号", "物流链接")
                          .build())) {
-                csv.printRecord("202611251200000001", "UPS", "1Z999AA10123456784", "https://www.ups.com/track");
+                csv.printRecord(excelText("202611251200000001"), "UPS", excelText("1Z999AA10123456784"),
+                        "https://www.ups.com/track");
             }
             return out.toByteArray();
         } catch (IOException e) {
@@ -168,6 +170,11 @@ public class OrderFulfillmentService {
                     errors.add(new RowError(rowNum, "", "订单号不能为空"));
                     continue;
                 }
+                if (EXCEL_MANGLED_NUMBER.matcher(orderNo).matches()) {
+                    errors.add(new RowError(rowNum, orderNo,
+                            "订单号被 Excel 改成了科学计数法，已无法还原；请重新导出，或把订单号列设为“文本”后重新填写"));
+                    continue;
+                }
                 if (carrier.isEmpty() || tracking.isEmpty()) {
                     errors.add(new RowError(rowNum, orderNo, "承运商和运单号不能为空"));
                     continue;
@@ -203,6 +210,26 @@ public class OrderFulfillmentService {
         String sku = item.getSku() == null || item.getSku().isBlank() ? "" : "[" + item.getSku() + "] ";
         return sku + item.getProductName() + " x" + item.getQuantity();
     }
+
+    /** Excel 把长数字改写成的科学计数法，如 2.02611E+17。 */
+    private static final Pattern EXCEL_MANGLED_NUMBER = Pattern.compile("[0-9](\\.[0-9]+)?[eE][+-]?[0-9]+");
+
+    /**
+     * 订单号、电话、运单号这类“长得像数字”的文本：前面加一个制表符，Excel 打开时按文本显示，
+     * 不会把 18 位订单号改成科学计数法丢失精度，也不会去掉电话开头的 0 和 +。
+     * 制表符开头同样不会被当成公式；导入时会被自动去掉。其他内容按 {@link #safe} 处理。
+     */
+    static String excelText(String value) {
+        if (value == null || value.isEmpty()) {
+            return "";
+        }
+        if (LOOKS_NUMERIC.matcher(value).matches()) {
+            return "\t" + value;
+        }
+        return safe(value);
+    }
+
+    private static final Pattern LOOKS_NUMERIC = Pattern.compile("[+]?[0-9][0-9 ()\\-]*");
 
     /** 防止 Excel 公式注入（以 = + - @ 开头的单元格前置单引号）。 */
     private static String safe(String value) {

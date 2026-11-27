@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.MissingNode;
 import com.javastorm.shop.config.ExternalCircuitBreakers;
+import com.javastorm.shop.config.RemoteRejectedException;
 import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.service.BusinessException;
@@ -281,6 +282,10 @@ public class PayPalPaymentGateway implements PaymentGateway {
                 }
                 if (res.statusCode() < 200 || res.statusCode() >= 300) {
                     log.warn("PayPal API 调用失败 status={} uri={} body={}", res.statusCode(), req.uri(), res.body());
+                    if (isRejection(res.statusCode())) {
+                        // PayPal 正常、只是拒绝了这次请求（如付款方式被拒 422），不计入熔断
+                        throw new RemoteRejectedException("error.payment.rejected", "PayPal 拒绝了这次付款请求，请换一种付款方式或稍后再试");
+                    }
                     throw new BusinessException("error.payment.unavailable", "PayPal 支付服务暂时不可用，请稍后再试");
                 }
                 return JSON.readTree(res.body());
@@ -292,6 +297,11 @@ public class PayPalPaymentGateway implements PaymentGateway {
                 throw new BusinessException("error.payment.unavailable", "PayPal 支付服务暂时不可用，请稍后再试");
             }
         }, "error.payment.unavailable", "PayPal 支付服务暂时不可用，请稍后再试");
+    }
+
+    /** 4xx 是 PayPal 拒绝了请求；408 超时和 429 限流仍按服务不可用处理。 */
+    static boolean isRejection(int status) {
+        return status >= 400 && status < 500 && status != 408 && status != 429;
     }
 
     private void requireEnabled() {

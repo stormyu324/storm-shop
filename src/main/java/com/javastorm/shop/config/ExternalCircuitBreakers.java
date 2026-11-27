@@ -27,6 +27,8 @@ public class ExternalCircuitBreakers {
                 .failureRateThreshold(50.0f)
                 .waitDurationInOpenState(Duration.ofSeconds(30))
                 .permittedNumberOfCallsInHalfOpenState(3)
+                // 服务正常、只是拒绝了这次请求（付款被拒、4xx）不算故障，不计入失败率
+                .ignoreExceptions(RemoteRejectedException.class)
                 .build();
         this.registry = CircuitBreakerRegistry.of(config);
     }

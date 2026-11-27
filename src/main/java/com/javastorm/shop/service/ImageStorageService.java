@@ -121,6 +121,18 @@ public class ImageStorageService {
         }
         validateImage(bytes);
         String filename = UUID.randomUUID().toString().replace("-", "") + "." + ext;
-        return backend.put("products/" + filename, bytes, contentType);
+        // 存储时的类型按扩展名决定，不用浏览器上传时自己声明的值：
+        // 否则上传方可以把图片声明成 text/html 等类型，存到 S3 / CDN 后会被浏览器按那个类型打开
+        return backend.put("products/" + filename, bytes, contentTypeFor(ext));
+    }
+
+    static String contentTypeFor(String ext) {
+        return switch (ext) {
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "png" -> "image/png";
+            case "gif" -> "image/gif";
+            case "webp" -> "image/webp";
+            default -> throw new BusinessException("不支持的图片格式：" + ext);
+        };
     }
 }

@@ -126,7 +126,7 @@ public class OrderMailService {
                 LocalDateTime.now().plus(ORDER_NOTICE_TTL));
     }
 
-    @Scheduled(fixedDelayString = "${shop.mail.poll-delay-ms:10000}", initialDelay = 15000)
+    @Scheduled(fixedDelayString = "${shop.mail.poll-delay-ms:10000}", initialDelayString = "${shop.mail.initial-delay-ms:15000}")
     @SchedulerLock(name = "order_mail_deliver", lockAtMostFor = "PT4M")
     public void deliver() {
         if (!available()) {
