@@ -25,6 +25,10 @@ public class PaymentGatewayRegistry {
                 .toList();
     }
 
+    public boolean anyEnabled() {
+        return gateways.stream().anyMatch(PaymentGateway::isEnabled);
+    }
+
     public boolean anyEnabledFor(Currency currency) {
         return gateways.stream().anyMatch(g -> g.isEnabledFor(currency));
     }

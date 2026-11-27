@@ -2,6 +2,7 @@ package com.javastorm.shop.payment;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.MissingNode;
 import com.javastorm.shop.config.ExternalCircuitBreakers;
 import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
@@ -135,20 +136,44 @@ public class PayPalPaymentGateway implements PaymentGateway {
     }
 
     @Override
-    public GatewaySessionState retrieveOrCapture(String sessionId) {
+    public GatewaySessionState retrieve(String sessionId) {
         requireEnabled();
         String ppId = stripPrefix(sessionId);
-        JsonNode orderNode = getJson("/v2/checkout/orders/" + ppId);
-        String status = orderNode.path("status").asText("");
-        if ("APPROVED".equalsIgnoreCase(status)) {
-            orderNode = postJson("/v2/checkout/orders/" + ppId + "/capture", Map.of(), "storm-pp-cap-" + ppId);
-            status = orderNode.path("status").asText("");
+        JsonNode orderNode = getJsonOrNull("/v2/checkout/orders/" + ppId);
+        if (orderNode == null) {
+            // PayPal 上已不存在（未批准的订单约 3 小时后被 PayPal 自动作废）：没付款，也不能再付
+            return new GatewaySessionState(SESSION_PREFIX + ppId, null, false, false, false);
         }
+        return state(ppId, orderNode);
+    }
+
+    /** 顾客已批准（APPROVED）时向 PayPal 捕获扣款；其他状态只返回查询结果。 */
+    @Override
+    public GatewaySessionState capture(String sessionId) {
+        requireEnabled();
+        String ppId = stripPrefix(sessionId);
+        JsonNode orderNode = getJsonOrNull("/v2/checkout/orders/" + ppId);
+        if (orderNode == null) {
+            return new GatewaySessionState(SESSION_PREFIX + ppId, null, false, false, false);
+        }
+        if ("APPROVED".equalsIgnoreCase(orderNode.path("status").asText(""))) {
+            orderNode = postJson("/v2/checkout/orders/" + ppId + "/capture", Map.of(), "storm-pp-cap-" + ppId);
+        }
+        return state(ppId, orderNode);
+    }
+
+    /**
+     * PayPal 订单为 COMPLETED 只表示已发起扣款；钱是否到账要看扣款记录本身的状态：
+     * COMPLETED 才算已付款，PENDING（eCheck、风控审核等）是处理中，DECLINED / FAILED 是没扣到钱。
+     */
+    private static GatewaySessionState state(String ppId, JsonNode orderNode) {
+        String status = orderNode.path("status").asText("").toUpperCase(Locale.ROOT);
         String orderNo = extractOrderNo(orderNode);
-        boolean paid = "COMPLETED".equalsIgnoreCase(status);
-        boolean open = "CREATED".equalsIgnoreCase(status) || "PAYER_ACTION_REQUIRED".equalsIgnoreCase(status)
-                || "APPROVED".equalsIgnoreCase(status);
-        return new GatewaySessionState(SESSION_PREFIX + ppId, orderNo, paid, open);
+        String captureStatus = extractCaptureStatus(orderNode);
+        boolean paid = "COMPLETED".equals(status) && "COMPLETED".equals(captureStatus);
+        boolean pending = "COMPLETED".equals(status) && "PENDING".equals(captureStatus);
+        boolean open = Set.of("CREATED", "SAVED", "PAYER_ACTION_REQUIRED", "APPROVED").contains(status);
+        return new GatewaySessionState(SESSION_PREFIX + ppId, orderNo, paid, open, pending);
     }
 
     @Override
@@ -204,7 +229,21 @@ public class PayPalPaymentGateway implements PaymentGateway {
         }
     }
 
+    /** 查询订单；PayPal 返回 404（订单不存在或已作废）时返回 null。 */
+    private JsonNode getJsonOrNull(String path) {
+        JsonNode node = get(path);
+        return node.isMissingNode() ? null : node;
+    }
+
     private JsonNode getJson(String path) {
+        JsonNode node = get(path);
+        if (node.isMissingNode()) {
+            throw new BusinessException("error.payment.unavailable", "PayPal 记录不存在，请在 PayPal 后台核查");
+        }
+        return node;
+    }
+
+    private JsonNode get(String path) {
         HttpRequest req = HttpRequest.newBuilder(URI.create(apiBase + path))
                 .timeout(TIMEOUT)
                 .header("Authorization", "Bearer " + accessToken())
@@ -236,6 +275,10 @@ public class PayPalPaymentGateway implements PaymentGateway {
         return breakers.execute("paypal", () -> {
             try {
                 HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                if (res.statusCode() == 404 && "GET".equals(req.method())) {
+                    // 查询的记录不存在是正常结果，不算 PayPal 故障，不能计入熔断
+                    return MissingNode.getInstance();
+                }
                 if (res.statusCode() < 200 || res.statusCode() >= 300) {
                     log.warn("PayPal API 调用失败 status={} uri={} body={}", res.statusCode(), req.uri(), res.body());
                     throw new BusinessException("error.payment.unavailable", "PayPal 支付服务暂时不可用，请稍后再试");
@@ -295,6 +338,17 @@ public class PayPalPaymentGateway implements PaymentGateway {
             }
         }
         return null;
+    }
+
+    private static String extractCaptureStatus(JsonNode node) {
+        JsonNode units = node.path("purchase_units");
+        if (units.isArray() && !units.isEmpty()) {
+            JsonNode captures = units.get(0).path("payments").path("captures");
+            if (captures.isArray() && !captures.isEmpty()) {
+                return captures.get(0).path("status").asText("").toUpperCase(Locale.ROOT);
+            }
+        }
+        return "";
     }
 
     private static String extractCaptureId(JsonNode node) {

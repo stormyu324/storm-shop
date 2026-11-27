@@ -101,14 +101,15 @@ public class PaymentReconciliationService {
             try {
                 PaymentGateway gateway = gateways.forSession(order.getPaymentSessionId())
                         .orElseThrow(() -> new BusinessException("未找到对应支付通道"));
-                state = gateway.retrieveOrCapture(order.getPaymentSessionId());
+                // 对账只查询，绝不扣款：已取消的订单即使顾客在 PayPal 上点过批准，也不能在这里被扣钱
+                state = gateway.retrieve(order.getPaymentSessionId());
                 if (state == null) {
                     throw new BusinessException("支付平台未返回会话状态");
                 }
             } catch (RuntimeException e) {
                 discrepancies++;
                 recordIfAbsent(date, order, STRIPE_QUERY_ERROR,
-                        "查询 Stripe 会话失败：" + e.getMessage(), false, created);
+                        "查询支付平台失败：" + e.getMessage(), false, created);
                 continue;
             }
 
@@ -116,19 +117,19 @@ public class PaymentReconciliationService {
                 orderService.markPaid(order.getOrderNo(), state.sessionId());
                 autoRecovered++;
                 recordIfAbsent(date, order, AUTO_RECOVERED_PAID,
-                        "本地为待付款但 Stripe 已收款，对账任务已自动补单为已付款", true, created);
+                        "本地为待付款但支付平台已收款，对账任务已自动补单为已付款", true, created);
             } else if (order.getStatus() == OrderStatus.CANCELLED && state.paid()) {
                 discrepancies++;
-                log.error("对账发现高危异常：订单 {} 本地已取消但 Stripe 已收款（session {}）",
+                log.error("对账发现高危异常：订单 {} 本地已取消但支付平台已收款（session {}）",
                         order.getOrderNo(), order.getPaymentSessionId());
                 recordIfAbsent(date, order, CANCELLED_BUT_PAID,
-                        "本地订单已取消但 Stripe 已收款，请立即在 Stripe 后台核查并退款", false, created);
+                        "本地订单已取消但支付平台已收款，请立即在支付平台后台核查并退款", false, created);
             } else if (FULFILLED_OR_PAID.contains(order.getStatus()) && !state.paid()) {
                 discrepancies++;
-                log.error("对账发现异常：订单 {} 本地状态 {} 但 Stripe 未显示已收款（session {}）",
+                log.error("对账发现异常：订单 {} 本地状态 {} 但支付平台未显示已收款（session {}）",
                         order.getOrderNo(), order.getStatus(), order.getPaymentSessionId());
                 recordIfAbsent(date, order, PAID_NOT_CAPTURED,
-                        "本地状态为 " + order.getStatus() + " 但 Stripe 会话未付款，请核查", false, created);
+                        "本地状态为 " + order.getStatus() + " 但支付平台显示未付款，请核查", false, created);
             } else {
                 matched++;
             }

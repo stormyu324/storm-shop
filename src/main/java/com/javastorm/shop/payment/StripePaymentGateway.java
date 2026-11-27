@@ -43,7 +43,7 @@ public class StripePaymentGateway implements PaymentGateway {
     }
 
     @Override
-    public GatewaySessionState retrieveOrCapture(String sessionId) {
+    public GatewaySessionState retrieve(String sessionId) {
         StripePaymentService.SessionState state = stripe.retrieve(sessionId);
         return new GatewaySessionState(state.sessionId(), state.orderNo(), state.paid(), state.open());
     }
@@ -51,6 +51,11 @@ public class StripePaymentGateway implements PaymentGateway {
     @Override
     public void expire(String sessionId) {
         stripe.expire(sessionId);
+    }
+
+    @Override
+    public boolean expiresRemotely() {
+        return true;
     }
 
     @Override

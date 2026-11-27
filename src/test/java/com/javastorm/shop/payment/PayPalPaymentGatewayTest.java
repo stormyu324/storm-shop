@@ -22,6 +22,8 @@ class PayPalPaymentGatewayTest {
 
     private HttpServer server;
     private AtomicInteger tokenCalls;
+    private final AtomicInteger captureCalls = new AtomicInteger();
+    private volatile String captureStatus = "COMPLETED";
     private PayPalPaymentGateway gateway;
 
     @BeforeEach
@@ -63,13 +65,17 @@ class PayPalPaymentGatewayTest {
                         }
                         """);
             } else if ("POST".equals(method) && "/v2/checkout/orders/PP-ORDER-100/capture".equals(path)) {
+                captureCalls.incrementAndGet();
                 reply(exchange, 201, """
                         {
                           "id": "PP-ORDER-100",
                           "status": "COMPLETED",
-                          "purchase_units": [{"reference_id": "ORD-2026-0001"}]
+                          "purchase_units": [{
+                            "reference_id": "ORD-2026-0001",
+                            "payments": {"captures": [{"id": "CAP-999", "status": "%s"}]}
+                          }]
                         }
-                        """);
+                        """.formatted(captureStatus));
             } else {
                 reply(exchange, 404, "{}");
             }
@@ -104,12 +110,19 @@ class PayPalPaymentGatewayTest {
         assertThat(checkout.url()).contains("PP-ORDER-100");
         assertThat(gateway.ownsSession(checkout.sessionId())).isTrue();
 
-        // 2) 顾客批准回跳 -> 自动捕获扣款并返回 paid=true
-        PaymentGateway.GatewaySessionState state = gateway.retrieveOrCapture(checkout.sessionId());
+        // 2) 只查询：顾客已批准但不扣款
+        PaymentGateway.GatewaySessionState queried = gateway.retrieve(checkout.sessionId());
+        assertThat(queried.paid()).isFalse();
+        assertThat(queried.open()).isTrue();
+        assertThat(captureCalls.get()).isZero();
+
+        // 3) 顾客批准回跳 -> 捕获扣款，扣款记录 COMPLETED 才算已付款
+        PaymentGateway.GatewaySessionState state = gateway.capture(checkout.sessionId());
+        assertThat(captureCalls.get()).isEqualTo(1);
         assertThat(state.paid()).isTrue();
         assertThat(state.orderNo()).isEqualTo("ORD-2026-0001");
 
-        // 3) 退款
+        // 4) 退款
         order.setPaymentSessionId(checkout.sessionId());
         PaymentGateway.RefundResult refund = gateway.refund(order, "case-1", null);
         assertThat(refund.id()).isEqualTo("REF-888");
@@ -117,6 +130,37 @@ class PayPalPaymentGatewayTest {
 
         // OAuth2 令牌应只获取一次并命中缓存
         assertThat(tokenCalls.get()).isEqualTo(1);
+    }
+
+    @Test
+    void pendingCaptureIsNotTreatedAsPaid() {
+        captureStatus = "PENDING";
+        PaymentGateway.GatewaySessionState state = gateway.capture("paypal:PP-ORDER-100");
+        assertThat(state.paid()).isFalse();
+        assertThat(state.pending()).isTrue();
+        assertThat(state.open()).isFalse();
+    }
+
+    @Test
+    void declinedCaptureIsNeitherPaidNorPending() {
+        captureStatus = "DECLINED";
+        PaymentGateway.GatewaySessionState state = gateway.capture("paypal:PP-ORDER-100");
+        assertThat(state.paid()).isFalse();
+        assertThat(state.pending()).isFalse();
+    }
+
+    @Test
+    void expiredPayPalOrderIsClosedAndDoesNotTripCircuitBreaker() {
+        // PayPal 上已作废的订单返回 404：视为没付款、也不能再付，不抛异常
+        for (int i = 0; i < 20; i++) {
+            PaymentGateway.GatewaySessionState state = gateway.retrieve("paypal:GONE-" + i);
+            assertThat(state.paid()).isFalse();
+            assertThat(state.open()).isFalse();
+            assertThat(state.pending()).isFalse();
+        }
+        // 大量 404 之后熔断器仍是关闭的，正常结账不受影响
+        assertThat(gateway.createCheckout(sampleOrder(), "https://shop.example.com", true).sessionId())
+                .isEqualTo("paypal:PP-ORDER-100");
     }
 
     private static CustomerOrder sampleOrder() {
