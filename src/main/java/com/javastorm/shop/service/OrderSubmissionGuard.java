@@ -45,7 +45,12 @@ public class OrderSubmissionGuard {
     public static final Duration AUTO_TTL = Duration.ofSeconds(30);
     static final int MAX_ENTRIES = 10_000;
     static final int PER_ADDRESS = 20;
-    private static final Duration LOCK_TTL = Duration.ofSeconds(30);
+    /**
+     * 下单锁的有效期必须长于一次下单的最长耗时：下单时会同步创建 Stripe / PayPal 付款页，
+     * Stripe 默认连接超时 30 秒 + 读取超时 80 秒，PayPal 鉴权和建单各最多 15 + 15 秒。
+     * 锁提前过期会让同一个请求的重复提交也进入下单，可能下出两单。正常情况下下单结束就会主动释放锁。
+     */
+    static final Duration LOCK_TTL = Duration.ofSeconds(150);
     private static final long LOCK_WAIT_MS = 5_000L;
 
     private static final DefaultRedisScript<Long> UNLOCK_SCRIPT = new DefaultRedisScript<>(

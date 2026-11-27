@@ -3,6 +3,7 @@ package com.javastorm.shop.payment;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.javastorm.shop.config.ExternalCircuitBreakers;
+import com.javastorm.shop.config.RemoteRejectedException;
 import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.OrderItem;
@@ -154,6 +155,10 @@ public class StripePaymentService {
             try {
                 Session session = client.v1().checkout().sessions().create(params.build());
                 return new Checkout(session.getId(), session.getUrl());
+            } catch (InvalidRequestException e) {
+                // Stripe 正常、只是拒绝了这次请求（参数不合法等），不计入熔断
+                log.warn("Stripe 拒绝创建付款页，订单 {}", order.getOrderNo(), e);
+                throw new RemoteRejectedException("error.payment.rejected", "支付平台拒绝了这次付款请求，请换一种付款方式或稍后再试");
             } catch (StripeException e) {
                 log.warn("创建 Stripe 付款页失败，订单 {}", order.getOrderNo(), e);
                 throw new BusinessException("error.payment.unavailable", "在线支付暂时不可用，请稍后再试");
@@ -184,6 +189,10 @@ public class StripePaymentService {
         return breakers.execute("stripe", () -> {
             try {
                 return state(client.v1().checkout().sessions().retrieve(sessionId));
+            } catch (InvalidRequestException e) {
+                // 付款页不存在等：Stripe 正常，不计入熔断
+                log.warn("Stripe 拒绝查询付款页 {}", sessionId, e);
+                throw new RemoteRejectedException("error.payment.unavailable", "在线支付暂时不可用，请稍后再试");
             } catch (StripeException e) {
                 log.warn("查询 Stripe 付款页失败 {}", sessionId, e);
                 throw new BusinessException("error.payment.unavailable", "在线支付暂时不可用，请稍后再试");

@@ -1,5 +1,8 @@
 package com.javastorm.shop.service;
 
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import com.javastorm.shop.domain.MemberAccount;
 import com.javastorm.shop.domain.MemberAddress;
 import com.javastorm.shop.domain.MemberChallenge;
@@ -37,8 +40,9 @@ public class MemberService {
     private final ProductRepository products;
     private final OrderMailService mail;
     private final SecureRandom random = new SecureRandom();
-    // 只按来源 IP 限制（10 分钟 5 次），不设全站每日总数：否则少数人刷满后所有顾客当天都收不到验证码
-    private final RateLimiter limiter = new RateLimiter(5, Integer.MAX_VALUE, Clock.systemUTC());
+    // 只按来源 IP 限制（10 分钟 5 次），不设全站每日总数：否则少数人刷满后所有顾客当天都收不到验证码。
+    // 开启 Redis 时各节点共用同一份计数，否则换着节点请求就能绕过限制
+    private final RateLimiter limiter;
 
     public MemberService(
             MemberRepository members,
@@ -46,7 +50,11 @@ public class MemberService {
             MemberAddressRepository addresses,
             MemberFavoriteRepository favorites,
             ProductRepository products,
-            OrderMailService mail) {
+            OrderMailService mail,
+            @Value("${shop.redis.enabled:false}") boolean redisEnabled,
+            ObjectProvider<StringRedisTemplate> redisProvider) {
+        this.limiter = new RateLimiter(5, Integer.MAX_VALUE, Clock.systemUTC(), "member-code",
+                redisEnabled ? redisProvider.getIfAvailable() : null);
         this.members = members;
         this.challenges = challenges;
         this.addresses = addresses;

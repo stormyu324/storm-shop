@@ -59,6 +59,8 @@ public class CacheConfig {
         return RedisCacheManager.builder(factory)
                 .cacheDefaults(base)
                 .withInitialCacheConfigurations(perCache)
+                // 清缓存等事务提交后再做，避免提交前被并发请求把旧数据重新写回缓存
+                .transactionAware()
                 .build();
     }
 }

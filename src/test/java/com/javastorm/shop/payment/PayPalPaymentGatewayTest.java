@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** 通过本地 Mock HTTP 服务完整验证 PayPal Orders v2：鉴权缓存、建单、回跳捕获扣款与退款。 */
 class PayPalPaymentGatewayTest {
@@ -48,6 +49,14 @@ class PayPalPaymentGatewayTest {
                             {"rel": "approve", "href": "https://www.sandbox.paypal.com/checkoutnow?token=PP-ORDER-100"}
                           ]
                         }
+                        """);
+            } else if ("GET".equals(method) && "/v2/checkout/orders/PP-DECLINED".equals(path)) {
+                reply(exchange, 200, """
+                        {"id": "PP-DECLINED", "status": "APPROVED", "purchase_units": [{"reference_id": "ORD-2026-0002"}]}
+                        """);
+            } else if ("POST".equals(method) && "/v2/checkout/orders/PP-DECLINED/capture".equals(path)) {
+                reply(exchange, 422, """
+                        {"name": "UNPROCESSABLE_ENTITY", "details": [{"issue": "INSTRUMENT_DECLINED"}]}
                         """);
             } else if ("GET".equals(method) && "/v2/checkout/orders/PP-ORDER-100".equals(path)) {
                 reply(exchange, 200, """
@@ -161,6 +170,26 @@ class PayPalPaymentGatewayTest {
         // 大量 404 之后熔断器仍是关闭的，正常结账不受影响
         assertThat(gateway.createCheckout(sampleOrder(), "https://shop.example.com", true).sessionId())
                 .isEqualTo("paypal:PP-ORDER-100");
+    }
+
+    @Test
+    void declinedPaymentsDoNotBlockOtherCustomersCheckout() {
+        // 多位顾客的付款方式被 PayPal 拒绝（422）：是正常业务结果，不能把熔断器打开
+        for (int i = 0; i < 10; i++) {
+            assertThatThrownBy(() -> gateway.capture("paypal:PP-DECLINED"))
+                    .isInstanceOf(com.javastorm.shop.config.RemoteRejectedException.class);
+        }
+        assertThat(gateway.createCheckout(sampleOrder(), "https://shop.example.com", true).sessionId())
+                .isEqualTo("paypal:PP-ORDER-100");
+    }
+
+    @Test
+    void onlyNonRetryableClientErrorsCountAsRejections() {
+        assertThat(PayPalPaymentGateway.isRejection(400)).isTrue();
+        assertThat(PayPalPaymentGateway.isRejection(422)).isTrue();
+        assertThat(PayPalPaymentGateway.isRejection(408)).isFalse();
+        assertThat(PayPalPaymentGateway.isRejection(429)).isFalse();
+        assertThat(PayPalPaymentGateway.isRejection(500)).isFalse();
     }
 
     private static CustomerOrder sampleOrder() {

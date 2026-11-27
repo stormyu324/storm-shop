@@ -99,6 +99,41 @@ class BulkFulfillmentTest {
         assertThat(reloaded2.getStatus()).isEqualTo(OrderStatus.PLACED);
     }
 
+    @Test
+    @WithMockUser(username = "support", roles = "SUPPORT")
+    void exportedOrderNumbersSurviveExcelAndCanBeImportedBack() throws Exception {
+        Product p = new Product();
+        p.setName("Excel 订单号测试商品");
+        p.setSku("XLS-" + UUID.randomUUID().toString().substring(0, 8));
+        p.setPrice(new BigDecimal("10.00"));
+        p.setStock(5);
+        p.setStatus(ProductStatus.ON_SALE);
+        p = products.save(p);
+        CustomerOrder order = place(p.getId(), "Carol", "carol@example.com");
+
+        // 订单号、电话前加制表符：Excel 按文本显示，18 位订单号不会变成科学计数法、电话不会丢开头的 0
+        String exported = mvc.perform(get("/api/admin/orders/fulfillment/export"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertThat(exported).contains("\t" + order.getOrderNo()).contains("\t13900139000");
+
+        // 导出的订单号（带制表符）直接导回来能匹配到订单；被 Excel 改坏的订单号给出明确提示
+        String csv = String.join("\n",
+                "订单号,承运商,运单号",
+                "\t" + order.getOrderNo() + ",顺丰,\tSF0001",
+                "2.02611E+17,顺丰,SF0002");
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "shipments.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
+        mvc.perform(multipart("/api/admin/orders/fulfillment/import").file(file).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.succeeded").value(1))
+                .andExpect(jsonPath("$.errors[0].message").value(containsString("科学计数法")));
+
+        CustomerOrder reloaded = orders.findById(order.getId()).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(OrderStatus.SHIPPED);
+        assertThat(reloaded.getTrackingNumber()).isEqualTo("SF0001");
+    }
+
     private CustomerOrder place(Long productId, String name, String email) {
         Cart cart = new Cart();
         cart.add(productId, 1);
