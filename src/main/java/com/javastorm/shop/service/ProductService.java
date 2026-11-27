@@ -197,21 +197,21 @@ public class ProductService {
         return changed;
     }
 
-    /** 事务提交后，删除已经没有任何商品使用的本地图片文件（回滚时不删）。 */
+    /** 事务提交后，删除已经没有任何商品使用的受管图片（本地上传目录或对象存储；回滚时不删）。 */
     private void deleteUnusedImagesAfterCommit(List<String> candidates) {
-        List<String> local = candidates.stream().filter(u -> u.startsWith(ImageStorageService.URL_PREFIX)).toList();
-        if (local.isEmpty()) {
+        List<String> managed = candidates.stream().filter(images::isManagedUrl).toList();
+        if (managed.isEmpty()) {
             return;
         }
         products.flush();
-        List<String> unused = local.stream().filter(u -> products.countUsingImage(u) == 0).toList();
+        List<String> unused = managed.stream().filter(u -> products.countUsingImage(u) == 0).toList();
         if (unused.isEmpty()) {
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                unused.forEach(images::deleteIfLocal);
+                unused.forEach(images::deleteIfManaged);
             }
         });
     }

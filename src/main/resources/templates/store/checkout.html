@@ -71,6 +71,13 @@
           <button type="button" class="ghost" id="applyCoupon">试算优惠 / Apply code</button>
           <p id="couponFeedback" role="status"></p><p id="couponDiscount" class="muted"></p>
         </div>
+        <div class="field" th:if="${paymentProviders != null and #lists.size(paymentProviders) > 1}">
+            <label for="paymentProvider" th:text="${en} ? 'Payment method' : '支付方式'">支付方式</label>
+            <select id="paymentProvider" th:field="*{paymentProvider}">
+                <option th:each="p : ${paymentProviders}" th:value="${p}"
+                        th:text="${p == 'paypal' ? 'PayPal' : 'Stripe (Card / Apple Pay / Google Pay)'}"></option>
+            </select>
+        </div>
         <p class="muted" th:text="${onlinePayment} ? #{checkout.onlinePayment} : #{checkout.noPayment}">本店暂未接入在线支付</p>
         <button type="submit" id="submitOrder" th:disabled="${!cart.deliverable}"
                 th:text="${onlinePayment} ? #{checkout.submitPay} : #{checkout.submit}">提交订单</button>

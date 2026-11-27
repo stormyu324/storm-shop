@@ -1,0 +1,99 @@
+# 日均 1,000-2,000 单推荐集群拓扑：
+# Nginx 负载均衡 + 2 个无状态应用节点 + MySQL 8 + Redis 7
+#
+# 启动前请先在同级目录准备 .env 或导出环境变量：
+#   ADMIN_PASSWORD / MYSQL_PASSWORD / MYSQL_ROOT_PASSWORD / S3_* / STRIPE_*
+# 启动命令：
+#   docker compose -f docker-compose.cluster.yml up -d --build
+
+x-shop-env: &shop-env
+  SPRING_PROFILES_ACTIVE: prod
+  ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:?请在环境变量中设置强密码 ADMIN_PASSWORD}
+  PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost}
+  DB_URL: jdbc:mysql://mysql:3306/shop?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+  DB_USERNAME: shop
+  DB_PASSWORD: ${MYSQL_PASSWORD:?请设置 MYSQL_PASSWORD}
+  DB_POOL_MAX: ${DB_POOL_MAX:-20}
+  REDIS_ENABLED: "true"
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+  STORAGE_TYPE: ${STORAGE_TYPE:-local}
+  S3_ENDPOINT: ${S3_ENDPOINT:-}
+  S3_REGION: ${S3_REGION:-auto}
+  S3_BUCKET: ${S3_BUCKET:-}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+  S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:-}
+  MAIL_CONCURRENCY: ${MAIL_CONCURRENCY:-4}
+  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      shop-1:
+        condition: service_healthy
+      shop-2:
+        condition: service_healthy
+
+  shop-1:
+    build: .
+    restart: unless-stopped
+    environment: *shop-env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  shop-2:
+    build: .
+    restart: unless-stopped
+    environment: *shop-env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_bin
+    environment:
+      MYSQL_DATABASE: shop
+      MYSQL_USER: shop
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请设置 MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请设置 MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u shop -p$$MYSQL_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  mysql-data:
+  redis-data:

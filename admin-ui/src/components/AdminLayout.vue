@@ -16,6 +16,7 @@
         <el-menu-item v-if="can('OPERATIONS')" index="/coupons"><el-icon><Ticket /></el-icon><template #title>优惠券</template></el-menu-item>
         <el-menu-item v-if="can('OPERATIONS')" index="/analytics"><el-icon><DataAnalysis /></el-icon><template #title>运营数据</template></el-menu-item>
         <el-menu-item v-if="can('ADMIN')" index="/staff"><el-icon><UserFilled /></el-icon><template #title>员工权限</template></el-menu-item>
+        <el-menu-item v-if="can('ADMIN')" index="/reconciliation"><el-icon><CircleCheck /></el-icon><template #title>支付对账</template></el-menu-item>
         <el-menu-item v-if="can('ADMIN')" index="/audit"><el-icon><Document /></el-icon><template #title>操作记录</template></el-menu-item>
       </el-menu>
     </el-aside>

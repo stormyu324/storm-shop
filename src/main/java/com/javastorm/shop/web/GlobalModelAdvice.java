@@ -2,7 +2,7 @@ package com.javastorm.shop.web;
 
 import com.javastorm.shop.config.LocaleConfig;
 import com.javastorm.shop.domain.Currency;
-import com.javastorm.shop.payment.StripePaymentService;
+import com.javastorm.shop.payment.PaymentGatewayRegistry;
 import com.javastorm.shop.service.BusinessException;
 import com.javastorm.shop.service.Cart;
 import com.javastorm.shop.service.RecommendationService;
@@ -21,14 +21,14 @@ public class GlobalModelAdvice {
 
     private final Cart cart;
     private final MessageSource messages;
-    private final StripePaymentService stripe;
+    private final PaymentGatewayRegistry gateways;
     private final RecommendationService recommendations;
 
-    public GlobalModelAdvice(Cart cart, MessageSource messages, StripePaymentService stripe,
+    public GlobalModelAdvice(Cart cart, MessageSource messages, PaymentGatewayRegistry gateways,
                              RecommendationService recommendations) {
         this.cart = cart;
         this.messages = messages;
-        this.stripe = stripe;
+        this.gateways = gateways;
         this.recommendations = recommendations;
     }
 
@@ -54,10 +54,16 @@ public class GlobalModelAdvice {
         return recommendations.isEnabled();
     }
 
-    /** 当前币种是否走 Stripe 在线支付（结账页的提示和按钮文字用）。 */
+    /** 当前币种是否开通任意在线支付（Stripe / PayPal）。 */
     @ModelAttribute("onlinePayment")
     public boolean onlinePayment() {
-        return stripe.isEnabledFor(LocaleConfig.currentCurrency());
+        return gateways.anyEnabledFor(LocaleConfig.currentCurrency());
+    }
+
+    /** 当前币种已启用的在线支付通道列表（如 ["stripe", "paypal"]）。 */
+    @ModelAttribute("paymentProviders")
+    public java.util.List<String> paymentProviders() {
+        return gateways.enabledProvidersFor(LocaleConfig.currentCurrency());
     }
 
     @ExceptionHandler(BusinessException.class)

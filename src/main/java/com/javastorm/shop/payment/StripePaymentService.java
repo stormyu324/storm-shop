@@ -2,6 +2,7 @@ package com.javastorm.shop.payment;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.javastorm.shop.config.ExternalCircuitBreakers;
 import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.OrderItem;
@@ -48,11 +49,14 @@ public class StripePaymentService {
     private final StripeClient client;
     private final String webhookSecret;
     private final Set<Currency> currencies;
+    private final ExternalCircuitBreakers breakers;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public StripePaymentService(@Value("${shop.stripe.secret-key:}") String secretKey,
                                 @Value("${shop.stripe.webhook-secret:}") String webhookSecret,
                                 @Value("${shop.stripe.currencies:USD}") String currencies,
-                                @Value("${shop.stripe.api-base:}") String apiBase) {
+                                @Value("${shop.stripe.api-base:}") String apiBase,
+                                ExternalCircuitBreakers breakers) {
         if (StringUtils.hasText(secretKey)) {
             StripeClient.StripeClientBuilder builder = StripeClient.builder().setApiKey(secretKey.trim());
             if (StringUtils.hasText(apiBase)) {
@@ -67,6 +71,11 @@ public class StripePaymentService {
                 .map(String::trim).filter(StringUtils::hasText)
                 .map(c -> Currency.valueOf(c.toUpperCase(Locale.ROOT)))
                 .collect(Collectors.toUnmodifiableSet());
+        this.breakers = breakers == null ? new ExternalCircuitBreakers() : breakers;
+    }
+
+    public StripePaymentService(String secretKey, String webhookSecret, String currencies, String apiBase) {
+        this(secretKey, webhookSecret, currencies, apiBase, new ExternalCircuitBreakers());
     }
 
     public boolean isEnabled() {
@@ -141,13 +150,15 @@ public class StripePaymentService {
         if (order.getShippingFee() != null && order.getShippingFee().signum() > 0) {
             params.addLineItem(lineItem(english ? "Shipping" : "运费", order.getShippingFee(), 1, currency));
         }
-        try {
-            Session session = client.v1().checkout().sessions().create(params.build());
-            return new Checkout(session.getId(), session.getUrl());
-        } catch (StripeException e) {
-            log.warn("创建 Stripe 付款页失败，订单 {}", order.getOrderNo(), e);
-            throw new BusinessException("error.payment.unavailable", "在线支付暂时不可用，请稍后再试");
-        }
+        return breakers.execute("stripe", () -> {
+            try {
+                Session session = client.v1().checkout().sessions().create(params.build());
+                return new Checkout(session.getId(), session.getUrl());
+            } catch (StripeException e) {
+                log.warn("创建 Stripe 付款页失败，订单 {}", order.getOrderNo(), e);
+                throw new BusinessException("error.payment.unavailable", "在线支付暂时不可用，请稍后再试");
+            }
+        }, "error.payment.unavailable", "在线支付暂时不可用，请稍后再试");
     }
 
     private static SessionCreateParams.LineItem lineItem(String name, BigDecimal unitPrice, long quantity, String currency) {
@@ -170,12 +181,14 @@ public class StripePaymentService {
 
     public SessionState retrieve(String sessionId) {
         requireEnabled();
-        try {
-            return state(client.v1().checkout().sessions().retrieve(sessionId));
-        } catch (StripeException e) {
-            log.warn("查询 Stripe 付款页失败 {}", sessionId, e);
-            throw new BusinessException("error.payment.unavailable", "在线支付暂时不可用，请稍后再试");
-        }
+        return breakers.execute("stripe", () -> {
+            try {
+                return state(client.v1().checkout().sessions().retrieve(sessionId));
+            } catch (StripeException e) {
+                log.warn("查询 Stripe 付款页失败 {}", sessionId, e);
+                throw new BusinessException("error.payment.unavailable", "在线支付暂时不可用，请稍后再试");
+            }
+        }, "error.payment.unavailable", "在线支付暂时不可用，请稍后再试");
     }
 
     /** 让付款页立即失效（顾客取消或超时）；已经失效的忽略。 */

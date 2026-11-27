@@ -1,0 +1,9 @@
+.git
+target
+data
+uploads
+backups
+admin-ui/node
+admin-ui/node_modules
+config.env
+*.log

@@ -4,11 +4,13 @@ import com.javastorm.shop.domain.AfterSale;
 import com.javastorm.shop.domain.AfterSaleHistory;
 import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.OrderStatus;
-import com.javastorm.shop.payment.StripePaymentService;
+import com.javastorm.shop.payment.PaymentGateway;
+import com.javastorm.shop.payment.PaymentGatewayRegistry;
 import com.javastorm.shop.repository.AfterSaleHistoryRepository;
 import com.javastorm.shop.repository.AfterSaleRepository;
 import com.javastorm.shop.repository.OrderRepository;
 import com.javastorm.shop.repository.ProductRepository;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -30,7 +32,7 @@ public class OrderCareService {
     private final AfterSaleRepository cases;
     private final ProductRepository products;
     private final OrderMailService mail;
-    private final StripePaymentService stripe;
+    private final PaymentGatewayRegistry gateways;
     private final TransactionTemplate transactions;
     private final AfterSaleHistoryRepository history;
 
@@ -39,7 +41,7 @@ public class OrderCareService {
             AfterSaleRepository cases,
             ProductRepository products,
             OrderMailService mail,
-            StripePaymentService stripe,
+            PaymentGatewayRegistry gateways,
             PlatformTransactionManager manager,
             AfterSaleHistoryRepository history,
             CouponService coupons) {
@@ -49,7 +51,7 @@ public class OrderCareService {
         this.cases = cases;
         this.products = products;
         this.mail = mail;
-        this.stripe = stripe;
+        this.gateways = gateways;
         transactions = new TransactionTemplate(manager);
     }
 
@@ -235,6 +237,7 @@ public class OrderCareService {
      * 再在事务外调用 Stripe，最后重新加锁记录结果。Stripe 有幂等键，重复请求不会重复退款。
      */
     @Scheduled(fixedDelay = 60000, initialDelayString = "${shop.refunds.initial-delay-ms:30000}")
+    @SchedulerLock(name = "after_sale_process_refunds", lockAtMostFor = "PT5M")
     public void processRefunds() {
         for (AfterSale candidate
                 : cases.findTop20ByStateAndNextAttemptBeforeOrderByIdAsc("PROCESSING", LocalDateTime.now())) {
@@ -242,13 +245,15 @@ public class OrderCareService {
             if (job == null) {
                 continue;
             }
-            StripePaymentService.RefundState result = null;
+            PaymentGateway.RefundResult result = null;
             try {
-                result = stripe.refund(job.order(), job.key(), job.refundId());
+                PaymentGateway gateway = gateways.forSession(job.order().getPaymentSessionId())
+                        .orElseThrow(() -> new BusinessException("无法识别的支付通道"));
+                result = gateway.refund(job.order(), job.key(), job.refundId());
             } catch (BusinessException e) {
                 // 结果不明确（网络、服务异常），下一步按失败计次，稍后重试前先核对
             }
-            StripePaymentService.RefundState outcome = result;
+            PaymentGateway.RefundResult outcome = result;
             transactions.executeWithoutResult(status -> apply(job, outcome));
         }
     }
@@ -267,8 +272,8 @@ public class OrderCareService {
         return new RefundJob(a.getId(), order.getId(), a.getRefundGeneration(), key, a.getRefundId(), order);
     }
 
-    /** result 为 null 表示调用 Stripe 失败、结果不明确。 */
-    private void apply(RefundJob job, StripePaymentService.RefundState result) {
+    /** result 为 null 表示调用支付平台失败、结果不明确。 */
+    private void apply(RefundJob job, PaymentGateway.RefundResult result) {
         CustomerOrder order = locked(job.orderId());
         AfterSale a = cases.lock(job.caseId()).orElseThrow();
         if (!"PROCESSING".equals(a.getState()) || a.getRefundGeneration() != job.generation()) {

@@ -1,6 +1,12 @@
 <template>
   <div>
-    <div class="page-head"><h1>订单</h1></div>
+    <div class="page-head">
+      <h1>订单</h1>
+      <div class="head-actions">
+        <el-button @click="exportFulfillment">导出待发货 CSV</el-button>
+        <el-button type="primary" @click="openBulkShip">批量导入发货</el-button>
+      </div>
+    </div>
     <el-card>
       <el-tabs v-model="tab" @tab-change="onTab">
         <el-tab-pane label="全部" name="all" />
@@ -67,6 +73,27 @@
       </div>
     </el-card>
     <OrderCare ref="care" @changed="load" />
+
+    <el-dialog v-model="bulkOpen" title="批量导入物流发货" width="560px">
+      <p class="muted" style="margin-top:0">
+        上传 CSV 文件批量回填承运商、运单号并标记已发货（自动发送发货邮件）。
+        支持直接上传「导出待发货 CSV」填完最后三列后的文件，或先
+        <a href="/api/admin/orders/fulfillment/template" target="_blank">下载模板</a>。
+      </p>
+      <div class="bulk-upload">
+        <input ref="fileInput" type="file" accept=".csv,text/csv" @change="onFileChange" />
+        <el-button type="primary" :loading="importing" :disabled="!bulkFile" @click="submitBulkShip">开始导入</el-button>
+      </div>
+      <div v-if="bulkResult" class="bulk-result">
+        <el-alert :type="bulkResult.failed > 0 ? 'warning' : 'success'" :closable="false"
+                  :title="`共处理 ${bulkResult.total} 条：成功 ${bulkResult.succeeded} 条，失败 ${bulkResult.failed} 条`" />
+        <el-table v-if="bulkResult.errors && bulkResult.errors.length" :data="bulkResult.errors" size="small" max-height="240" style="margin-top:12px">
+          <el-table-column prop="row" label="行号" width="70" />
+          <el-table-column prop="orderNo" label="订单号" width="160" />
+          <el-table-column prop="message" label="失败原因" />
+        </el-table>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -88,6 +115,44 @@ const page = ref({ items: [], totalItems: 0 })
 const loading = ref(false)
 const wide = window.innerWidth >= 900
 const countries = ref({})
+const bulkOpen = ref(false)
+const bulkFile = ref(null)
+const importing = ref(false)
+const bulkResult = ref(null)
+const fileInput = ref(null)
+
+function exportFulfillment() {
+  window.location.href = '/api/admin/orders/fulfillment/export?toFulfil=true'
+}
+
+function openBulkShip() {
+  bulkResult.value = null
+  bulkFile.value = null
+  if (fileInput.value) fileInput.value.value = ''
+  bulkOpen.value = true
+}
+
+function onFileChange(e) {
+  bulkFile.value = e.target.files?.[0] || null
+}
+
+async function submitBulkShip() {
+  if (!bulkFile.value) return
+  importing.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', bulkFile.value)
+    bulkResult.value = await api.upload('/api/admin/orders/fulfillment/import', fd)
+    if (bulkResult.value.succeeded > 0) {
+      ElMessage.success(`已批量发货 ${bulkResult.value.succeeded} 单`)
+      await load()
+    }
+  } catch (e) {
+    ElMessage.error(errorText(e))
+  } finally {
+    importing.value = false
+  }
+}
 
 const ACTIONS = { SHIPPED: '标记发货', COMPLETED: '标记完成', CANCELLED: '取消订单' }
 const actionLabel = s => ACTIONS[s] || ORDER_STATUS[s].label
@@ -154,6 +219,9 @@ onMounted(async () => {
 
 <style scoped>
 .small { font-size: 12px; }
+.head-actions { display: flex; gap: 10px; }
+.bulk-upload { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 0; }
+.bulk-result { margin-top: 14px; }
 .detail { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; padding: 4px 16px; }
 .detail p { margin: 6px 0 0; }
 </style>

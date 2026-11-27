@@ -26,6 +26,8 @@ import java.util.Map;
 public class TableCopier {
 
     private static final int BATCH_SIZE = 500;
+    /** 框架元信息表，不参与业务数据迁移和空库校验。 */
+    private static final java.util.Set<String> IGNORED_TABLES = java.util.Set.of("flyway_schema_history", "shedlock");
 
     /** 复制结果：每张表的行数，以及源库里目标库已不再使用的表和列（旧版本遗留，不复制）。 */
     public record Report(Map<String, Long> rows, List<String> skippedTables, List<String> skippedColumns) {
@@ -149,7 +151,10 @@ public class TableCopier {
         try (ResultSet rs = meta.getTables(connection.getCatalog(), schema(connection), "%", new String[] {"TABLE"})) {
             while (rs.next()) {
                 String name = rs.getString("TABLE_NAME");
-                tables.put(name.toLowerCase(Locale.ROOT), name);
+                String lower = name.toLowerCase(Locale.ROOT);
+                if (!IGNORED_TABLES.contains(lower)) {
+                    tables.put(lower, name);
+                }
             }
         }
         return tables;

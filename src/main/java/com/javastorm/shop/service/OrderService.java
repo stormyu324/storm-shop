@@ -115,19 +115,27 @@ public class OrderService {
         boolean english = currency == Currency.USD;
 
         int weight = 0;
-        for (Map.Entry<Long, Integer> e : cart.getItems().entrySet()) {
-            Product p = products.findById(e.getKey())
-                    .orElseThrow(() -> new BusinessException("error.cart.stale", "购物车中有商品已被删除，请刷新购物车"));
+        // 按商品 ID 升序扣减库存，保证多笔并发订单包含多个相同商品时加锁顺序一致，避免数据库死锁
+        List<Map.Entry<Long, Integer>> sortedItems = cart.getItems().entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .toList();
+        for (Map.Entry<Long, Integer> e : sortedItems) {
+            Long productId = e.getKey();
             int qty = e.getValue();
-            String title = p.title(english);
-            if (!p.isOnSale()) {
-                throw new BusinessException("error.product.offShelf", "「" + p.getName() + "」已下架", title);
+            if (qty <= 0) {
+                throw new BusinessException("error.cart.invalidQuantity", "购买数量必须大于 0");
             }
-            if (p.getStock() < qty) {
+            int updated = products.deductStock(productId, qty);
+            Product p = products.findById(productId)
+                    .orElseThrow(() -> new BusinessException("error.cart.stale", "购物车中有商品已被删除，请刷新购物车"));
+            String title = p.title(english);
+            if (updated == 0) {
+                if (!p.isOnSale()) {
+                    throw new BusinessException("error.product.offShelf", "「" + p.getName() + "」已下架", title);
+                }
                 throw new BusinessException("error.product.lowStock",
                         "「" + p.getName() + "」库存不足，仅剩 " + p.getStock() + " 件", title, p.getStock());
             }
-            p.setStock(p.getStock() - qty);
             order.addItem(new OrderItem(p, title, pricing.price(p, currency), qty));
             weight += weightOf(p, qty);
         }

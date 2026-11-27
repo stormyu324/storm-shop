@@ -3,11 +3,14 @@ package com.javastorm.shop.service;
 import com.javastorm.shop.domain.Category;
 import com.javastorm.shop.repository.CategoryRepository;
 import com.javastorm.shop.repository.ProductRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /** 分类的增删改，规则由后台页面和后台接口共用。 */
@@ -22,6 +25,13 @@ public class CategoryService {
         this.products = products;
     }
 
+    /** 所有分类（按排序），集群模式下走 Redis 缓存。 */
+    @Cacheable("categories")
+    @Transactional(readOnly = true)
+    public List<Category> listAll() {
+        return categories.findAllByOrderBySortOrderAscIdAsc();
+    }
+
     /** 所有分类及其商品数，按排序。 */
     @Transactional(readOnly = true)
     public Map<Category, Long> listWithCounts() {
@@ -32,6 +42,7 @@ public class CategoryService {
         return counts;
     }
 
+    @CacheEvict(value = "categories", allEntries = true)
     @Transactional
     public Category create(String name, String nameEn, int sortOrder) {
         String n = checkName(name, null);
@@ -41,6 +52,7 @@ public class CategoryService {
         return categories.save(c);
     }
 
+    @CacheEvict(value = "categories", allEntries = true)
     @Transactional
     public Category update(Long id, String name, String nameEn, int sortOrder) {
         Category c = categories.findById(id).orElseThrow(() -> new BusinessException("分类不存在"));
@@ -51,6 +63,7 @@ public class CategoryService {
     }
 
     /** @return 被删除的分类名称 */
+    @CacheEvict(value = "categories", allEntries = true)
     @Transactional
     public String delete(Long id) {
         Category c = categories.findById(id).orElseThrow(() -> new BusinessException("分类不存在"));

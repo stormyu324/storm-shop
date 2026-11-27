@@ -43,6 +43,16 @@ public class PaymentController {
 
     @GetMapping("/checkout/paid")
     public String paid(@RequestParam("session_id") String sessionId, HttpSession session, Model model) {
+        return handlePaidReturn(sessionId, session, model);
+    }
+
+    @GetMapping("/checkout/paypal/return")
+    public String paypalReturn(@RequestParam("token") String paypalOrderId, HttpSession session, Model model) {
+        return handlePaidReturn(com.javastorm.shop.payment.PayPalPaymentGateway.SESSION_PREFIX + paypalOrderId,
+                session, model);
+    }
+
+    private String handlePaidReturn(String sessionId, HttpSession session, Model model) {
         var result = flow.confirmReturn(sessionId);
         if (result.isEmpty()) {
             return "redirect:/";

@@ -4,6 +4,7 @@ import com.javastorm.shop.domain.OrderStatus;
 import com.javastorm.shop.domain.ProductStatus;
 import com.javastorm.shop.repository.OrderRepository;
 import com.javastorm.shop.repository.ProductRepository;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +26,7 @@ public class DashboardService {
                         long ordersToFulfil, long awaitingPayment) {
     }
 
+    @Cacheable(value = "dashboard", key = "'stats'")
     @Transactional(readOnly = true)
     public Stats stats() {
         return new Stats(

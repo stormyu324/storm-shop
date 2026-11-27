@@ -34,6 +34,17 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     long countUsingImage(@Param("url") String url);
 
     /**
+     * 下单时原子扣减库存：单条 SQL 校验在售状态与可用库存并扣减，避免爆款并发抢购时
+     * JPA 乐观锁频繁版本冲突；同时递增版本号，防止后台编辑保存时覆盖已变动的库存。
+     *
+     * @return 更新行数（1 表示扣减成功；0 表示商品不存在、已下架或库存不足）
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("update Product p set p.stock = p.stock - :quantity, p.version = p.version + 1 " +
+           "where p.id = :id and p.status = com.javastorm.shop.domain.ProductStatus.ON_SALE and p.stock >= :quantity")
+    int deductStock(@Param("id") Long id, @Param("quantity") int quantity);
+
+    /**
      * 取消或退款时把库存加回去：一条 SQL 原子更新，不会和同时下单扣库存发生乐观锁冲突；
      * 同时递增版本号，正在编辑这个商品的后台页面保存时能发现库存已变。
      */

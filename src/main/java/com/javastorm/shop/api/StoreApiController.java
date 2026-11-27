@@ -17,7 +17,7 @@ import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.OrderStatus;
 import com.javastorm.shop.domain.Product;
 import com.javastorm.shop.payment.PaymentFlow;
-import com.javastorm.shop.payment.StripePaymentService;
+import com.javastorm.shop.payment.PaymentGatewayRegistry;
 import com.javastorm.shop.repository.CategoryRepository;
 import com.javastorm.shop.repository.ProductRepository;
 import com.javastorm.shop.service.Cart;
@@ -76,7 +76,7 @@ public class StoreApiController {
     private final VariantService variantService;
     private final OrderService orderService;
     private final OrderPlacer orderPlacer;
-    private final StripePaymentService stripe;
+    private final PaymentGatewayRegistry paymentGateways;
     private final PaymentFlow paymentFlow;
     private final SiteUrls siteUrls;
     private final ApiMapper mapper;
@@ -87,7 +87,7 @@ public class StoreApiController {
 
     public StoreApiController(ProductService productService, ProductRepository products, CategoryRepository categories,
                               VariantService variantService, OrderService orderService, OrderPlacer orderPlacer,
-                              StripePaymentService stripe, PaymentFlow paymentFlow, SiteUrls siteUrls,
+                              PaymentGatewayRegistry paymentGateways, PaymentFlow paymentFlow, SiteUrls siteUrls,
                               ApiMapper mapper, Validator validator, OrderSubmissionGuard submissions,
             CouponService coupons, MemberService members) {
         this.coupons = coupons;
@@ -99,7 +99,7 @@ public class StoreApiController {
         this.variantService = variantService;
         this.orderService = orderService;
         this.orderPlacer = orderPlacer;
-        this.stripe = stripe;
+        this.paymentGateways = paymentGateways;
         this.paymentFlow = paymentFlow;
         this.siteUrls = siteUrls;
         this.mapper = mapper;
@@ -177,6 +177,7 @@ public class StoreApiController {
     @Operation(summary = "下单", description = "扣减库存并创建订单。该币种开通了 Stripe 时订单为“待付款”，"
             + "返回 paymentUrl，把顾客跳转过去付款；30 分钟内未付款自动取消。")
     public OrderCreated placeOrder(@Valid @RequestBody OrderRequest req,
+            @RequestParam(required = false) String paymentProvider,
             @RequestHeader(value = "Idempotency-Key", required = false) String key,
             HttpServletRequest http) {
         if (key != null && (key.isBlank() || key.length() > 128)) {
@@ -193,10 +194,10 @@ public class StoreApiController {
         String requestKey = key == null ? "auto:" + fingerprint : "key:" + key;
         Duration ttl = key == null ? OrderSubmissionGuard.AUTO_TTL : OrderSubmissionGuard.KEY_TTL;
         return submissions.submit(clientId, http.getRemoteAddr(), requestKey, fingerprint, ttl,
-                () -> createOrder(req, cur, existing));
+                OrderCreated.class, () -> createOrder(req, cur, existing, paymentProvider));
     }
 
-    private OrderCreated createOrder(OrderRequest req, Currency cur, HttpSession session) {
+    private OrderCreated createOrder(OrderRequest req, Currency cur, HttpSession session, String paymentProvider) {
         CheckoutForm form = new CheckoutForm();
         form.setCustomerName(req.customerName());
         form.setPhone(req.phone());
@@ -219,10 +220,10 @@ public class StoreApiController {
         if (!errors.isEmpty()) {
             throw new ApiValidationException(errors);
         }
-        boolean online = stripe.isEnabledFor(cur);
+        boolean online = paymentGateways.anyEnabledFor(cur);
         CustomerOrder order = orderPlacer.place(cartOf(req.items()), form, cur, online);
         String paymentUrl = online && order.getStatus() == OrderStatus.PENDING_PAYMENT
-                ? paymentFlow.startPayment(order, null, siteUrls.baseUrl(), cur == Currency.USD)
+                ? paymentFlow.startPayment(order, null, siteUrls.baseUrl(), cur == Currency.USD, paymentProvider)
                 : null;
         return new OrderCreated(order.getOrderNo(), order.getStatus().name(), order.getCurrency(),
                 order.getItemsTotal(), order.getShippingFee(), order.getTotal(), paymentUrl, order.getDiscountAmount(), order.getCouponCode());

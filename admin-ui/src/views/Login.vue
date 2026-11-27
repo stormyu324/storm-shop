@@ -16,6 +16,9 @@
         <el-form-item label="密码">
           <el-input v-model="password" type="password" show-password autocomplete="current-password" size="large" @keyup.enter="submit" />
         </el-form-item>
+        <el-form-item label="双因素动态码（如已开启 MFA）">
+          <el-input v-model="totpCode" maxlength="6" inputmode="numeric" placeholder="未开启可留空" autocomplete="one-time-code" size="large" @keyup.enter="submit" />
+        </el-form-item>
         <el-button type="primary" size="large" :loading="loading" class="full" @click="submit">登录</el-button>
       </el-form>
       <p class="muted foot"><a href="/">返回商城</a></p>
@@ -32,6 +35,7 @@ const route = useRoute()
 const router = useRouter()
 const username = ref('admin')
 const password = ref('')
+const totpCode = ref('')
 const error = ref('')
 const loading = ref(false)
 
@@ -39,7 +43,7 @@ async function submit() {
   error.value = ''
   loading.value = true
   try {
-    await login(username.value, password.value)
+    await login(username.value, password.value, totpCode.value)
     router.replace(route.query.redirect || '/')
   } catch (e) {
     error.value = e.message

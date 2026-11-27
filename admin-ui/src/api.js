@@ -21,8 +21,8 @@ function csrfToken() {
   return m ? decodeURIComponent(m[1]) : ''
 }
 
-export async function request(method, url, body, { form = false } = {}) {
-  const headers = { Accept: 'application/json' }
+export async function request(method, url, body, { form = false, headers: extraHeaders = {} } = {}) {
+  const headers = { Accept: 'application/json', ...extraHeaders }
   if (method !== 'GET') headers['X-XSRF-TOKEN'] = csrfToken()
   let payload
   if (form) {

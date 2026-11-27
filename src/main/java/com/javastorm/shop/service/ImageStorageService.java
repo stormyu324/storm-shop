@@ -1,17 +1,14 @@
 package com.javastorm.shop.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -20,19 +17,27 @@ import java.util.UUID;
 import javax.imageio.ImageIO;
 import javax.imageio.stream.ImageInputStream;
 
-/** 把上传的商品图片保存到本地目录，并返回可访问的 URL（/uploads/products/xxx.jpg）。 */
+/**
+ * 商品图片校验与存储服务：统一执行扩展名、MIME、大小与像素解码校验，
+ * 底层通过 {@link ImageStorageBackend} 支持本地目录和 S3/OSS/R2 对象存储无缝切换。
+ */
 @Service
 public class ImageStorageService {
 
     public static final String URL_PREFIX = "/uploads/";
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png", "gif", "webp");
 
-    private static final Logger log = LoggerFactory.getLogger(ImageStorageService.class);
-
     private final Path root;
+    private final ImageStorageBackend backend;
 
-    public ImageStorageService(@Value("${shop.upload-dir}") String uploadDir) {
+    @Autowired
+    public ImageStorageService(@Value("${shop.upload-dir}") String uploadDir, ImageStorageBackend backend) {
         this.root = Path.of(uploadDir).toAbsolutePath().normalize();
+        this.backend = backend;
+    }
+
+    public ImageStorageService(String uploadDir) {
+        this(uploadDir, new LocalImageStorageBackend(uploadDir));
     }
 
     public Path getRoot() {
@@ -52,27 +57,25 @@ public class ImageStorageService {
         return urls;
     }
 
-    /** 删除本站上传目录里的图片文件；外部链接或不在上传目录内的路径会被忽略。 */
-    public void deleteIfLocal(String url) {
-        if (url == null || !url.startsWith(URL_PREFIX)) {
-            return;
-        }
-        Path file = root.resolve(url.substring(URL_PREFIX.length())).normalize();
-        if (!file.startsWith(root)) {
-            return;
-        }
-        try {
-            Files.deleteIfExists(file);
-        } catch (IOException e) {
-            log.warn("删除图片失败：{}", file, e);
-        }
+    public boolean isManagedUrl(String url) {
+        return backend.isManagedUrl(url);
     }
 
-    private void validateImage(MultipartFile file) {
-        if (file.getSize() > 10L * 1024 * 1024) {
+    /** 删除受管图片（本地上传目录或对象存储）；外部粘贴的图片链接会被忽略。 */
+    public void deleteIfManaged(String url) {
+        backend.delete(url);
+    }
+
+    /** 兼容旧调用名称。 */
+    public void deleteIfLocal(String url) {
+        deleteIfManaged(url);
+    }
+
+    private void validateImage(byte[] bytes) {
+        if (bytes.length > 10L * 1024 * 1024) {
             throw new BusinessException("图片超过 10MB 限制");
         }
-        try (InputStream input = file.getInputStream();
+        try (ByteArrayInputStream input = new ByteArrayInputStream(bytes);
              ImageInputStream image = ImageIO.createImageInputStream(input)) {
             var readers = ImageIO.getImageReaders(image);
             if (!readers.hasNext()) {
@@ -107,15 +110,17 @@ public class ImageStorageService {
         if (contentType != null && !contentType.startsWith("image/")) {
             throw new BusinessException("文件不是图片：" + file.getOriginalFilename());
         }
-        validateImage(file);
-        String filename = UUID.randomUUID().toString().replace("-", "") + "." + ext;
-        Path dir = root.resolve("products");
-        try (InputStream in = file.getInputStream()) {
-            Files.createDirectories(dir);
-            Files.copy(in, dir.resolve(filename), StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
-            throw new BusinessException("图片保存失败：" + e.getMessage());
+        if (file.getSize() > 10L * 1024 * 1024) {
+            throw new BusinessException("图片超过 10MB 限制");
         }
-        return URL_PREFIX + "products/" + filename;
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (IOException e) {
+            throw new BusinessException("读取图片失败：" + e.getMessage());
+        }
+        validateImage(bytes);
+        String filename = UUID.randomUUID().toString().replace("-", "") + "." + ext;
+        return backend.put("products/" + filename, bytes, contentType);
     }
 }
