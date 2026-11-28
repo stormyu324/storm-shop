@@ -162,6 +162,15 @@ public class CartController {
         return body;
     }
 
+    /** 线下收款订单提交后的成功页；订单只通过 flash 传过来，直接打开或刷新时回到首页，不能凭订单号看别人的信息。 */
+    @GetMapping("/order-success")
+    public String orderPlaced(Model model) {
+        if (!model.containsAttribute("order")) {
+            return "redirect:/";
+        }
+        return "store/order-success";
+    }
+
     @PostMapping("/checkout")
     public String placeOrder(@Valid @ModelAttribute("form") CheckoutForm form, BindingResult binding, Model model,
                              RedirectAttributes flash, HttpSession httpSession) {

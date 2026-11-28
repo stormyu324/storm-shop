@@ -19,6 +19,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 
 import java.io.IOException;
 
@@ -27,6 +29,36 @@ import java.io.IOException;
 public class SecurityConfig {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
+
+    /**
+     * 默认内容安全策略：脚本只允许本站文件（页面里不能有内联脚本，防 XSS 注入后执行）；
+     * 样式允许内联（后台 Element Plus 组件会动态插入样式）；图片允许 https 外链（商品图可能放在 CDN / 第三方）；
+     * 表单提交后会跳转到 Stripe / PayPal 付款页，所以 form-action 放行这两家。可用 SECURITY_CSP 覆盖。
+     */
+    static final String DEFAULT_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+            + "img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; "
+            + "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; "
+            + "form-action 'self' https://checkout.stripe.com https://*.paypal.com";
+
+    private final String contentSecurityPolicy;
+
+    public SecurityConfig(@Value("${shop.security.csp:}") String csp) {
+        this.contentSecurityPolicy = csp == null || csp.isBlank() ? DEFAULT_CSP : csp.trim();
+    }
+
+    /**
+     * 两条规则链共用的安全响应头。HSTS 只在 HTTPS 请求上发送（经反向代理时依赖 X-Forwarded-Proto），
+     * 告诉浏览器一年内只用 HTTPS 访问本站。
+     */
+    private void securityHeaders(HttpSecurity http) throws Exception {
+        http.headers(headers -> headers
+                .contentSecurityPolicy(csp -> csp.policyDirectives(contentSecurityPolicy))
+                .frameOptions(frame -> frame.deny())
+                .referrerPolicy(ref -> ref.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31_536_000))
+                .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy",
+                        "camera=(), microphone=(), geolocation=(), payment=(self)")));
+    }
 
     /**
      * 接口（/api/**）：未登录返回 401 JSON，不跳转登录页；CSRF 令牌放在 XSRF-TOKEN Cookie 里，
@@ -61,6 +93,7 @@ public class SecurityConfig {
                         .accessDeniedHandler((req, res, ex) -> json(res, 403,
                                 "没有权限，或请求缺少 CSRF 令牌（请求头 X-XSRF-TOKEN）")))
                 .requestCache(cache -> cache.disable());
+        securityHeaders(http);
         return http.build();
     }
 
@@ -82,6 +115,7 @@ public class SecurityConfig {
                         .anyRequest().permitAll())
                 // Stripe 服务器的通知没有 CSRF token，靠签名校验
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/stripe/webhook"));
+        securityHeaders(http);
         return http.build();
     }
 

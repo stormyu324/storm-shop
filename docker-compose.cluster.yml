@@ -1,40 +1,85 @@
 # 日均 1,000-2,000 单推荐集群拓扑：
-# Nginx 负载均衡 + 2 个无状态应用节点 + MySQL 8 + Redis 7
+# Nginx（HTTPS）负载均衡 + 2 个无状态应用节点 + MySQL 8 + Redis 7
 #
-# 启动前请先在同级目录准备 .env 或导出环境变量：
-#   ADMIN_PASSWORD / MYSQL_PASSWORD / MYSQL_ROOT_PASSWORD / S3_* / STRIPE_*
-# 启动命令：
-#   docker compose -f docker-compose.cluster.yml up -d --build
+# 首次部署（详见 docs/deploy-cluster.md）：
+#   1. ./deploy/init-secrets.sh            生成 secrets/ 下的随机密码文件，再按需填入 Stripe / PayPal 等密钥
+#   2. 放好 HTTPS 证书：deploy/certs/fullchain.pem 和 privkey.pem
+#      （正式域名用 ./deploy/issue-cert.sh 申请 Let's Encrypt 免费证书；本机试运行用 ./deploy/gen-self-signed-cert.sh）
+#   3. 在 .env 里设置 PUBLIC_BASE_URL=https://你的域名
+#   4. docker compose -f docker-compose.cluster.yml up -d --build
 #
+# 密码和密钥不写在环境变量里：都以文件形式挂载到容器的 /run/secrets/，应用启动时读取（见 SECRETS_DIR）。
 # 商品图片：默认 STORAGE_TYPE=local，两个节点共用同一个 uploads-data 卷（只适用于两个节点在同一台机器上）；
 # 节点分布在多台服务器上时，请改用 STORAGE_TYPE=s3 对接对象存储。
-# Redis 密码：设置 REDIS_PASSWORD 后 Redis 服务端和应用同时启用该密码；不设置时 Redis 无密码，仅在 Docker 内部网络可访问。
 
 x-shop-env: &shop-env
   SPRING_PROFILES_ACTIVE: prod
   ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-  ADMIN_PASSWORD: ${ADMIN_PASSWORD:?请在环境变量中设置强密码 ADMIN_PASSWORD}
-  PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost}
+  PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://localhost}
   DB_URL: jdbc:mysql://mysql:3306/shop?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
   DB_USERNAME: shop
-  DB_PASSWORD: ${MYSQL_PASSWORD:?请设置 MYSQL_PASSWORD}
   DB_POOL_MAX: ${DB_POOL_MAX:-20}
   REDIS_ENABLED: "true"
   REDIS_HOST: redis
   REDIS_PORT: "6379"
-  REDIS_PASSWORD: ${REDIS_PASSWORD:-}
   STORAGE_TYPE: ${STORAGE_TYPE:-local}
   UPLOAD_DIR: /app/uploads
   S3_ENDPOINT: ${S3_ENDPOINT:-}
   S3_REGION: ${S3_REGION:-auto}
   S3_BUCKET: ${S3_BUCKET:-}
   S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
-  S3_SECRET_KEY: ${S3_SECRET_KEY:-}
   S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:-}
+  PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
+  PAYPAL_SANDBOX: ${PAYPAL_SANDBOX:-true}
+  SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
+  SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+  SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+  SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:-true}
+  SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:-true}
+  SHOP_MAIL_FROM: ${SHOP_MAIL_FROM:-}
   MAIL_CONCURRENCY: ${MAIL_CONCURRENCY:-4}
-  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
-  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
-  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  SECRETS_DIR: /run/secrets/
+
+# 应用读取的密钥文件（文件名即变量名；没用到的功能留空文件即可）
+x-shop-secrets: &shop-secrets
+  - source: admin_password
+    target: ADMIN_PASSWORD
+  - source: admin_totp_secret
+    target: ADMIN_TOTP_SECRET
+  - source: db_password
+    target: DB_PASSWORD
+  - source: redis_password
+    target: REDIS_PASSWORD
+  - source: stripe_secret_key
+    target: STRIPE_SECRET_KEY
+  - source: stripe_webhook_secret
+    target: STRIPE_WEBHOOK_SECRET
+  - source: paypal_client_secret
+    target: PAYPAL_CLIENT_SECRET
+  - source: anthropic_api_key
+    target: ANTHROPIC_API_KEY
+  - source: s3_secret_key
+    target: S3_SECRET_KEY
+  - source: mail_password
+    target: spring.mail.password
+
+x-shop-node: &shop-node
+  build: .
+  restart: unless-stopped
+  environment: *shop-env
+  secrets: *shop-secrets
+  volumes:
+    - uploads-data:/app/uploads
+  logging: &logging
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+  depends_on:
+    mysql:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
 
 services:
   nginx:
@@ -42,37 +87,20 @@ services:
     restart: unless-stopped
     ports:
       - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
     volumes:
       - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/certs:/etc/nginx/certs:ro
+      - ./deploy/certbot-www:/var/www/certbot:ro
+    logging: *logging
     depends_on:
       shop-1:
         condition: service_healthy
       shop-2:
         condition: service_healthy
 
-  shop-1:
-    build: .
-    restart: unless-stopped
-    environment: *shop-env
-    volumes:
-      - uploads-data:/app/uploads
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  shop-2:
-    build: .
-    restart: unless-stopped
-    environment: *shop-env
-    volumes:
-      - uploads-data:/app/uploads
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+  shop-1: *shop-node
+  shop-2: *shop-node
 
   mysql:
     image: mysql:8.0
@@ -81,12 +109,18 @@ services:
     environment:
       MYSQL_DATABASE: shop
       MYSQL_USER: shop
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请设置 MYSQL_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请设置 MYSQL_ROOT_PASSWORD}
+      MYSQL_PASSWORD_FILE: /run/secrets/DB_PASSWORD
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/MYSQL_ROOT_PASSWORD
+    secrets:
+      - source: db_password
+        target: DB_PASSWORD
+      - source: mysql_root_password
+        target: MYSQL_ROOT_PASSWORD
     volumes:
       - mysql-data:/var/lib/mysql
+    logging: *logging
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u shop -p$$MYSQL_PASSWORD --silent"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u shop -p\"$$(cat /run/secrets/DB_PASSWORD)\" --silent"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -94,20 +128,54 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-    # 设置了 REDIS_PASSWORD 时才加 --requirepass（$$ 让变量留给容器里的 shell 展开）
+    secrets:
+      - source: redis_password
+        target: REDIS_PASSWORD
+    # 密钥文件非空时才加 --requirepass（$$ 让变量留给容器里的 shell 展开）
     command:
       - sh
       - -c
-      - exec redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru $${REDIS_PASSWORD:+--requirepass "$$REDIS_PASSWORD"}
+      - P=$$(cat /run/secrets/REDIS_PASSWORD 2>/dev/null); exec redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru $${P:+--requirepass "$$P"}
     volumes:
       - redis-data:/data
+    logging: *logging
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli $${REDIS_PASSWORD:+-a \"$$REDIS_PASSWORD\" --no-auth-warning} ping | grep -q PONG"]
+      test: ["CMD-SHELL", "P=$$(cat /run/secrets/REDIS_PASSWORD 2>/dev/null); redis-cli $${P:+-a \"$$P\" --no-auth-warning} ping | grep -q PONG"]
       interval: 10s
       timeout: 3s
       retries: 5
+
+  # 申请 / 续期 Let's Encrypt 证书时临时运行（./deploy/issue-cert.sh），平时不启动
+  certbot:
+    image: certbot/certbot:v2.11.0
+    profiles: ["certbot"]
+    volumes:
+      - ./deploy/certbot-www:/var/www/certbot
+      - ./deploy/letsencrypt:/etc/letsencrypt
+
+secrets:
+  admin_password:
+    file: ./secrets/ADMIN_PASSWORD
+  admin_totp_secret:
+    file: ./secrets/ADMIN_TOTP_SECRET
+  db_password:
+    file: ./secrets/DB_PASSWORD
+  mysql_root_password:
+    file: ./secrets/MYSQL_ROOT_PASSWORD
+  redis_password:
+    file: ./secrets/REDIS_PASSWORD
+  stripe_secret_key:
+    file: ./secrets/STRIPE_SECRET_KEY
+  stripe_webhook_secret:
+    file: ./secrets/STRIPE_WEBHOOK_SECRET
+  paypal_client_secret:
+    file: ./secrets/PAYPAL_CLIENT_SECRET
+  anthropic_api_key:
+    file: ./secrets/ANTHROPIC_API_KEY
+  s3_secret_key:
+    file: ./secrets/S3_SECRET_KEY
+  mail_password:
+    file: ./secrets/SPRING_MAIL_PASSWORD
 
 volumes:
   mysql-data:

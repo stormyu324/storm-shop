@@ -29,7 +29,7 @@
         </table>
     </div>
     <form class="card" th:action="@{/checkout}" th:object="${form}" method="post"
-          onsubmit="var b = document.getElementById('submitOrder'); if (b.dataset.sent) return false; b.dataset.sent = '1'; b.disabled = true; return true;">
+          data-submit-once="submitOrder">
         <div class="field" id="saved-addresses" hidden><label for="saved-address">会员地址 / Saved address</label><select id="saved-address"><option value="">手动填写 / Enter manually</option></select></div>
         <div class="field">
             <label for="email" th:text="${en} ? 'Email for order updates and secure lookup' : '邮箱（接收通知与查询验证码）'"></label>
@@ -84,28 +84,7 @@
     </form>
 </main>
 <footer th:replace="~{fragments/layout :: footer}"></footer>
-<script>
-    (function () {
-        var select = document.getElementById('country');
-        if (!select) return;
-        select.addEventListener('change', function () {
-            fetch('/checkout/shipping?country=' + encodeURIComponent(select.value) + '&couponCode=' + encodeURIComponent(document.getElementById('couponCode').value), {headers: {'Accept': 'application/json'}})
-                .then(function (res) { if (!res.ok) throw new Error('网络错误，请重试 / Network error'); return res.json(); })
-                .then(function (d) {
-                    document.getElementById('couponFeedback').textContent = d.couponError || '';
-                    document.getElementById('couponDiscount').textContent = d.discount ? '优惠 / Discount ' + d.discount : '';
-                    document.getElementById('shippingFee').textContent = d.shipping;
-                    document.getElementById('grandTotal').textContent = d.total;
-                    document.getElementById('freeHint').textContent = d.freeHint || '';
-                    var notice = document.getElementById('shipNotice');
-                    notice.textContent = d.notice || '';
-                    notice.style.display = d.deliverable ? 'none' : '';
-                    document.getElementById('submitOrder').disabled = !d.deliverable;
-                }).catch(function (e) { document.getElementById('couponFeedback').textContent = e.message; });
-        });
-        document.getElementById('applyCoupon').addEventListener('click', function () { select.dispatchEvent(new Event('change')); });
-    })();
-</script>
+<script th:src="@{/js/checkout.js}" defer></script>
 <script th:src="@{/js/member-checkout.js}" defer></script>
 </body>
 </html>

@@ -7,3 +7,6 @@ admin-ui/node
 admin-ui/node_modules
 config.env
 *.log
+secrets
+deploy/certs
+deploy/letsencrypt
