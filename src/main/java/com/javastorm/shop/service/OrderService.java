@@ -166,12 +166,15 @@ public class OrderService {
         return saved;
     }
 
-    /** 时间 + 4 位随机数；同一秒内重复时重新生成。 */
+    /**
+     * 时间（到秒）+ 6 位随机数，共 20 位数字。先查一次避开已有订单号；并发下单时两单仍可能在写入前拿到同一个号，
+     * 这时数据库唯一约束会拒绝后写入的那单，由 {@link OrderPlacer} 换个号重试。
+     */
     private String generateOrderNo() {
         String orderNo;
         do {
             orderNo = LocalDateTime.now().format(ORDER_NO_TIME)
-                    + String.format(Locale.ROOT, "%04d", ThreadLocalRandom.current().nextInt(10000));
+                    + String.format(Locale.ROOT, "%06d", ThreadLocalRandom.current().nextInt(1_000_000));
         } while (orders.existsByOrderNo(orderNo));
         return orderNo;
     }

@@ -93,3 +93,93 @@ jobs:
 
       - name: Backup image
         run: docker build -t storm-backup:ci deploy/backup
+
+  # 在 MySQL 8 上跑全部测试（正式环境推荐的数据库；默认的 test 任务用的是内存数据库 H2）
+  test-mysql:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root
+          MYSQL_USER: shop
+          MYSQL_PASSWORD: ci-shop
+          MYSQL_DATABASE: shop_test
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-root"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Create database with the same collation as production
+        run: |
+          mysql -h 127.0.0.1 -uroot -pci-root -e "
+            DROP DATABASE shop_test;
+            CREATE DATABASE shop_test CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+            GRANT ALL PRIVILEGES ON shop_test.* TO 'shop'@'%';"
+      - name: Run Maven test suite on MySQL
+        run: |
+          chmod +x mvnw
+          ./mvnw test -B \
+            "-Dspring.datasource.url=jdbc:mysql://127.0.0.1:3306/shop_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC" \
+            -Dspring.datasource.username=shop -Dspring.datasource.password=ci-shop
+
+  # 真正启动整套集群（HTTPS + 2 个节点 + MySQL + Redis + 备份 + 监控），跑冒烟测试、备份恢复演练和压测
+  cluster:
+    runs-on: ubuntu-latest
+    needs: test
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Prepare secrets, certificate and settings
+        run: |
+          ./deploy/init-secrets.sh
+          ./deploy/gen-self-signed-cert.sh localhost
+          # 压测从同一台机器发出所有请求，调大单 IP 下单上限
+          printf 'PUBLIC_BASE_URL=https://localhost\nORDER_PER_IP_LIMIT=1000000\n' > .env
+
+      - name: Start cluster with monitoring
+        run: docker compose -f docker-compose.cluster.yml --profile monitoring up -d --build --wait --wait-timeout 600
+
+      - name: Smoke test
+        run: ./deploy/smoke-test.sh https://localhost
+
+      - name: Backup and restore drill
+        run: |
+          docker compose -f docker-compose.cluster.yml run --rm backup --once
+          # 备份文件只有 root 能读（含顾客信息）
+          sudo ./deploy/restore-drill.sh
+
+      - name: Backup age metric is reported
+        run: |
+          token=$(cat secrets/METRICS_TOKEN)
+          docker compose -f docker-compose.cluster.yml exec -T shop-1 \
+            wget -q -O - --header "Authorization: Bearer $token" http://localhost:8080/actuator/prometheus \
+            | grep '^shop_backup_last_success_age_seconds' | tee /dev/stderr | grep -qv NaN
+
+      - name: Load test (2 nodes, 60 s)
+        run: |
+          java tools/LoadTest.java --base https://localhost --insecure --users 40 --duration 60 \
+            --admin-password-file secrets/ADMIN_PASSWORD --max-error-rate 0.01 --max-p95-ms 2000 \
+            --report load-test-report.md
+          cat load-test-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Container logs on failure
+        if: failure()
+        run: |
+          docker compose -f docker-compose.cluster.yml --profile monitoring ps
+          docker compose -f docker-compose.cluster.yml --profile monitoring logs --tail 150
+
+      - name: Stop cluster
+        if: always()
+        run: docker compose -f docker-compose.cluster.yml --profile monitoring down -v

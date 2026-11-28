@@ -13,17 +13,19 @@ fi
 domain=$1
 email=$2
 cd "$(dirname "$0")/.."
-compose="docker compose -f docker-compose.cluster.yml"
+# 预发布环境：COMPOSE="docker compose -f docker-compose.cluster.yml --env-file .env.staging -p storm-staging"
+compose=${COMPOSE:-docker compose -f docker-compose.cluster.yml}
 
 $compose run --rm certbot certonly --webroot -w /var/www/certbot \
     -d "$domain" --email "$email" --agree-tos --non-interactive --keep-until-expiring
 
 # certbot 把证书放在 live/域名/ 下（是指向 archive/ 的链接），复制成 nginx 读取的固定文件名
 live="deploy/letsencrypt/live/$domain"
-cp -L "$live/fullchain.pem" deploy/certs/fullchain.pem
-cp -L "$live/privkey.pem" deploy/certs/privkey.pem
-chmod 644 deploy/certs/fullchain.pem
-chmod 600 deploy/certs/privkey.pem
+certs=${CERTS_PATH:-deploy/certs}
+cp -L "$live/fullchain.pem" "$certs/fullchain.pem"
+cp -L "$live/privkey.pem" "$certs/privkey.pem"
+chmod 644 "$certs/fullchain.pem"
+chmod 600 "$certs/privkey.pem"
 
 $compose exec nginx nginx -s reload
 echo "证书已更新并重新加载：$domain"

@@ -7,18 +7,21 @@ set -eu
 
 cd "$(dirname "$0")/.."
 umask 077
-mkdir -p secrets
-chmod 700 secrets
+# 预发布环境用另一个目录：SECRETS_PATH=./secrets-staging ./deploy/init-secrets.sh
+dir=${SECRETS_PATH:-./secrets}
+mkdir -p "$dir"
+chmod 700 "$dir"
 
 random() {
     # 32 位字母数字，不含容易在 URL / 命令行里出问题的符号
-    LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32
+    # head 取够 32 个字符就关掉管道，tr 会报一句 Broken pipe，无害，不显示
+    LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 32
 }
 
 create() {
     name=$1
     value=$2
-    file="secrets/$name"
+    file="$dir/$name"
     if [ -e "$file" ]; then
         echo "已存在，跳过：$file"
         return

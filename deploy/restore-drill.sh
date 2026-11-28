@@ -5,7 +5,7 @@
 set -eu
 
 cd "$(dirname "$0")/.."
-backup=${1:-$(ls -d backups/storm-* 2>/dev/null | sort | tail -n 1 || true)}
+backup=${1:-$(ls -d "${BACKUP_PATH:-backups}"/storm-* 2>/dev/null | sort | tail -n 1 || true)}
 if [ -z "$backup" ] || [ ! -d "$backup" ]; then
     echo "找不到备份目录（backups/storm-*）。先运行：docker compose -f docker-compose.cluster.yml run --rm backup --once" >&2
     exit 1
@@ -17,7 +17,7 @@ echo "== 1/4 校验文件完整性"
 (cd "$backup" && sha256sum -c SHA256SUMS)
 
 name="storm-restore-drill-$$"
-pw=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 24)
+pw=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 24)
 cleanup() {
     docker rm -f "$name" > /dev/null 2>&1 || true
 }

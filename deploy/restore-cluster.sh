@@ -5,12 +5,13 @@
 set -eu
 
 cd "$(dirname "$0")/.."
-compose="docker compose -f docker-compose.cluster.yml"
+# 预发布环境：COMPOSE="docker compose -f docker-compose.cluster.yml --env-file .env.staging -p storm-staging"
+compose=${COMPOSE:-docker compose -f docker-compose.cluster.yml}
 backup=${1:-}
 if [ -z "$backup" ] || [ ! -d "$backup" ]; then
     echo "用法：$0 backups/storm-YYYYmmdd-HHMMSS" >&2
     echo "可用的备份：" >&2
-    ls -d backups/storm-* 2>/dev/null | sort >&2 || true
+    ls -d "${BACKUP_PATH:-backups}"/storm-* 2>/dev/null | sort >&2 || true
     exit 1
 fi
 backup=$(cd "$backup" && pwd)
