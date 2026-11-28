@@ -89,7 +89,7 @@
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>s3</artifactId>
-            <version>2.28.29</version>
+            <version>2.59.9</version>
         </dependency>
         <!-- 定时任务分布式锁（基于 JDBC，同时兼容 H2 与 MySQL 集群） -->
         <dependency>
