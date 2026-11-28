@@ -30,6 +30,8 @@
 | `secrets/S3_SECRET_KEY` | 图片存对象存储时 |
 | `secrets/SPRING_MAIL_PASSWORD` | 发邮件的 SMTP 密码 |
 | `secrets/ADMIN_TOTP_SECRET` | 后台双因素验证的密钥（Base32，可选） |
+| `secrets/METRICS_TOKEN` | 监控系统抓取指标用的令牌（已自动生成） |
+| `secrets/GRAFANA_ADMIN_PASSWORD` | 监控面板 Grafana 的 admin 密码（已自动生成） |
 
 `secrets/` 已加入 `.gitignore`，不会提交到 GitHub，也不在数据库备份里。**请另外把整个目录备份到安全的地方**（例如密码管理器），丢了要重新设置所有密码。
 
@@ -78,6 +80,16 @@ crontab -e
 # 加一行（路径换成你的项目目录）：
 0 4 * * 1 cd /path/to/storm-shop && ./deploy/issue-cert.sh shop.example.com 你的邮箱 >> /var/log/storm-cert.log 2>&1
 ```
+
+### 6. 启动监控和告警（推荐）
+
+先在 `deploy/monitoring/alertmanager.yml` 里填上接收告警的邮箱，然后：
+
+```bash
+docker compose -f docker-compose.cluster.yml --profile monitoring up -d
+```
+
+自动备份随集群一起运行。备份、恢复演练、监控面板和告警处理见 [operations.md](operations.md)。
 
 ## 安全设置说明
 

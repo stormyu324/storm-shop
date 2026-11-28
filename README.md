@@ -276,6 +276,7 @@ SPRING_PROFILES_ACTIVE=prod ADMIN_PASSWORD=你的强密码 java -jar target/shop
 
 一台服务器上跑 Nginx（HTTPS）+ 2 个应用节点 + MySQL + Redis，密码和密钥用文件管理、不写在环境变量里。
 步骤、HTTPS 证书申请和续期、更换密钥的方法见 [docs/deploy-cluster.md](docs/deploy-cluster.md)。
+上线后的自动备份与恢复演练、监控告警、查日志和告警处理手册见 [docs/operations.md](docs/operations.md)。
 
 ## 测试
 

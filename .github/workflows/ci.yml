@@ -34,3 +34,62 @@ jobs:
 
       - name: Verify Docker image build
         run: docker build -t storm-shop:ci .
+
+  # 部署配置检查：用各组件自带的校验工具检查 nginx、Prometheus 告警规则、Alertmanager、Loki、Alloy、
+  # docker compose 文件和部署脚本，配置写错在合并前就能发现
+  deploy-config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare secrets and a test certificate
+        run: |
+          ./deploy/init-secrets.sh
+          ./deploy/gen-self-signed-cert.sh localhost
+
+      - name: Shell scripts
+        run: shellcheck -S warning -s sh deploy/*.sh deploy/backup/backup.sh
+
+      - name: docker compose
+        run: docker compose -f docker-compose.cluster.yml --profile monitoring --profile certbot config -q
+
+      - name: nginx
+        run: |
+          docker run --rm --add-host shop-1:127.0.0.1 --add-host shop-2:127.0.0.1 \
+            -v "$PWD/deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
+            -v "$PWD/deploy/certs:/etc/nginx/certs:ro" \
+            nginx:1.27-alpine nginx -t
+
+      - name: Prometheus config and alert rules (with unit tests)
+        run: |
+          docker run --rm --entrypoint promtool \
+            -v "$PWD/deploy/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
+            -v "$PWD/deploy/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro" \
+            -v "$PWD/secrets/METRICS_TOKEN:/run/secrets/METRICS_TOKEN:ro" \
+            prom/prometheus:v2.54.1 check config /etc/prometheus/prometheus.yml
+          docker run --rm --entrypoint promtool -w /m -v "$PWD/deploy/monitoring:/m:ro" \
+            prom/prometheus:v2.54.1 test rules alerts.test.yml
+
+      - name: Alertmanager
+        run: |
+          docker run --rm --entrypoint amtool \
+            -v "$PWD/deploy/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro" \
+            -v "$PWD/secrets/SPRING_MAIL_PASSWORD:/run/secrets/SMTP_PASSWORD:ro" \
+            prom/alertmanager:v0.27.0 check-config /etc/alertmanager/alertmanager.yml
+
+      - name: Loki
+        run: |
+          docker run --rm -v "$PWD/deploy/monitoring/loki.yml:/etc/loki/loki.yml:ro" \
+            grafana/loki:3.2.1 -config.file=/etc/loki/loki.yml -verify-config
+
+      - name: Alloy
+        run: |
+          docker run --rm -v "$PWD/deploy/monitoring/config.alloy:/etc/alloy/config.alloy:ro" \
+            grafana/alloy:v1.4.3 fmt /etc/alloy/config.alloy
+
+      - name: Grafana dashboard JSON
+        run: python3 -c "import json; json.load(open('deploy/monitoring/grafana/dashboards/storm-shop.json'))"
+
+      - name: Backup image
+        run: docker build -t storm-backup:ci deploy/backup

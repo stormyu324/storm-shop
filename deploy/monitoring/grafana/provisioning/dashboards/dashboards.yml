@@ -1,0 +1,9 @@
+apiVersion: 1
+
+providers:
+  - name: storm-shop
+    folder: Storm 商城
+    type: file
+    disableDeletion: true
+    options:
+      path: /var/lib/grafana/dashboards

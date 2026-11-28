@@ -1,0 +1,136 @@
+# 告警规则：critical 需要马上处理（顾客已经受影响或钱可能出错），warning 当天处理即可
+groups:
+  - name: storm-shop-availability
+    rules:
+      - alert: ShopNodeDown
+        expr: up{job="storm-shop"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "应用节点 {{ $labels.instance }} 连不上"
+          description: "Prometheus 2 分钟抓不到这个节点的指标。另一个节点还在时顾客基本无感，但已没有冗余。查看：docker compose -f docker-compose.cluster.yml ps / logs"
+
+      - alert: ShopAllNodesDown
+        expr: count(up{job="storm-shop"} == 1) == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "所有应用节点都连不上，商城已无法访问"
+          description: "立即检查服务器和容器状态"
+
+      - alert: HighServerErrorRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{job="storm-shop", status=~"5.."}[5m]))
+            / sum(rate(http_server_requests_seconds_count{job="storm-shop"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "服务器错误率超过 5%"
+          description: "最近 5 分钟有 {{ $value | humanizePercentage }} 的请求返回 5xx。在 Grafana 的日志面板查 level=ERROR"
+
+      - alert: SlowResponses
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job="storm-shop", uri!~"/actuator.*"}[5m]))) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "95% 的请求响应超过 2 秒"
+          description: "当前 95 分位响应时间 {{ $value | humanizeDuration }}，可能是数据库慢或服务器资源不足"
+
+  - name: storm-shop-business
+    rules:
+      - alert: PaymentProviderCircuitOpen
+        expr: max by (service) (shop_circuit_breaker_open{service=~"stripe|paypal"}) == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service }} 支付连续失败，已暂停调用"
+          description: "顾客暂时无法用 {{ $labels.service }} 付款。检查支付平台状态页和密钥是否过期"
+
+      - alert: CheckoutFailures
+        expr: sum(increase(shop_payments_checkout_failed_total[15m])) >= 5
+        labels:
+          severity: warning
+        annotations:
+          summary: "15 分钟内有 {{ $value | printf \"%.0f\" }} 位顾客没能打开付款页"
+          description: "创建付款页失败，顾客的订单已自动取消。检查应用日志里的支付错误"
+
+      - alert: ReconciliationIssues
+        expr: max(shop_reconciliation_unresolved) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "有 {{ $value | printf \"%.0f\" }} 条支付对账异常未处理"
+          description: "可能有已取消但已收款、或已发货但未收款的订单。到后台「支付对账」页处理"
+
+      - alert: RefundsNeedAttention
+        expr: max(shop_refunds_failed) > 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "有 {{ $value | printf \"%.0f\" }} 笔退款失败或需要人工线下退款"
+          description: "到后台订单的「物流与售后」里处理"
+
+      - alert: MailBacklog
+        expr: max(shop_mail_backlog) > 50
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "有 {{ $value | printf \"%.0f\" }} 封通知邮件积压未发出"
+          description: "顾客收不到订单通知和验证码。检查 SMTP 设置和邮箱服务商是否限流"
+
+      - alert: MailDeliveryFailed
+        expr: increase(shop_mail_failed[1h]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "有邮件多次重试仍发送失败，已放弃"
+          description: "这些顾客没收到通知，必要时人工联系"
+
+      - alert: BackupTooOld
+        expr: max(shop_backup_last_success_age_seconds) > 26 * 3600
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "超过 26 小时没有成功备份"
+          description: "查看：docker compose -f docker-compose.cluster.yml logs backup"
+
+      - alert: BackupNeverSucceeded
+        expr: max(shop_backup_last_success_age_seconds) != max(shop_backup_last_success_age_seconds)
+        for: 30h
+        labels:
+          severity: critical
+        annotations:
+          summary: "集群启动 30 小时内一次备份都没成功"
+          description: "备份状态文件不存在。查看：docker compose -f docker-compose.cluster.yml logs backup"
+
+  - name: storm-shop-resources
+    rules:
+      - alert: JvmHeapNearlyFull
+        expr: |
+          sum by (instance) (jvm_memory_used_bytes{job="storm-shop", area="heap"})
+            / sum by (instance) (jvm_memory_max_bytes{job="storm-shop", area="heap"}) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "节点 {{ $labels.instance }} 内存使用超过 90%"
+          description: "持续下去可能内存溢出重启。考虑给容器加内存"
+
+      - alert: DatabaseConnectionsExhausted
+        expr: max by (instance) (hikaricp_connections_pending{job="storm-shop"}) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "节点 {{ $labels.instance }} 有请求在排队等数据库连接"
+          description: "数据库连接池不够用或有慢查询。可调大 DB_POOL_MAX，或检查 MySQL 慢查询"

@@ -108,6 +108,12 @@
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
+        <!-- 正式环境的结构化 JSON 日志（含异常堆栈），供 Loki 等日志系统汇总检索 -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
         <!-- 外部依赖熔断保护（Stripe / PayPal / Claude AI） -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>

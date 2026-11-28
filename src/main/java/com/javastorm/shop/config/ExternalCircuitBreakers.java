@@ -42,6 +42,12 @@ public class ExternalCircuitBreakers {
         }
     }
 
+    /** 熔断器是否打开（调用被暂停）；还没调用过的服务视为关闭。 */
+    public boolean isOpen(String name) {
+        return registry.find(name).map(cb -> cb.getState() == CircuitBreaker.State.OPEN
+                || cb.getState() == CircuitBreaker.State.FORCED_OPEN).orElse(false);
+    }
+
     public CircuitBreaker.State state(String name) {
         return registry.circuitBreaker(name).getState();
     }
