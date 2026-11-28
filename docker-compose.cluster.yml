@@ -201,6 +201,8 @@ services:
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
+      # 只有一个 Alertmanager，关掉多实例之间的集群通信
+      - --cluster.listen-address=
     ports:
       - "127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093"
     secrets:

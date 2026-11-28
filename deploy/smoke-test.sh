@@ -73,7 +73,8 @@ if $compose ps --status running --services 2>/dev/null | grep -qx prometheus; th
     done
     check "Prometheus 抓到两个节点（$up/2）" "[ '$up' -ge 2 ]"
     check "告警规则已加载" "inside prometheus http://localhost:9090/api/v1/rules | grep -q 'BackupTooOld'"
-    check "Alertmanager 就绪" "inside alertmanager http://localhost:9093/-/ready | grep -qi ready"
+    # 就绪接口返回 200 和 OK；wget 只在 2xx 时成功
+    check "Alertmanager 就绪" "inside alertmanager http://localhost:9093/-/ready > /dev/null"
     logs=0
     for _ in $(seq 1 12); do
         logs=$(inside prometheus 'http://loki:3100/loki/api/v1/query_range?query=%7Bservice%3D%22shop-1%22%7D&limit=5' | grep -o '"values":\[\[' | wc -l | tr -d ' ')
