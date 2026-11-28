@@ -10,4 +10,8 @@ public interface MemberFavoriteRepository extends JpaRepository<MemberFavorite, 
     List<MemberFavorite> findByMemberIdAndActiveTrueOrderByIdDesc(Long memberId);
 
     Optional<MemberFavorite> findByMemberIdAndProductId(Long memberId, Long productId);
+
+    List<MemberFavorite> findByMemberId(Long memberId);
+
+    void deleteByMemberId(Long memberId);
 }

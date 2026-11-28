@@ -30,6 +30,16 @@
  <section class="card"><h2>历史订单 / Order history</h2><div id="member-orders"></div>
  <div class="actions"><button id="orders-previous" type="button" class="ghost">上一页 / Previous</button><button id="orders-next" type="button" class="ghost">下一页 / Next</button></div></section>
  <section class="card"><h2>收藏商品 / Saved products</h2><div id="member-favorites"></div></section>
+ <section class="card"><h2>我的数据 / My data</h2>
+  <p class="muted">可以下载本站保存的你的全部个人信息（账户、地址、收藏、订单）。注销后账户、地址和收藏会被删除；历史订单只保留金额和商品用于记账，姓名、电话、地址、邮箱会被抹去，且不能恢复。 / Download everything we store about you, or delete your account. Past orders keep only amounts and items for accounting.</p>
+  <div class="actions">
+   <a id="member-export" class="btn ghost" href="/api/member/export" download="storm-my-data.json">下载我的数据 / Download my data</a>
+  </div>
+  <form id="member-delete">
+   <div class="field"><label for="member-delete-confirm">注销账户请输入 DELETE（30 分钟内需刚验证过邮箱） / Type DELETE to delete your account</label><input id="member-delete-confirm" required autocomplete="off" maxlength="10"></div>
+   <button type="submit" class="danger">注销账户 / Delete account</button>
+  </form>
+ </section>
 </div>
 </main><footer th:replace="~{fragments/layout :: footer}"></footer>
 <script th:src="@{/js/member.js}" defer></script></body></html>

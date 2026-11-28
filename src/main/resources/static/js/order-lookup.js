@@ -45,12 +45,15 @@
     }
     const states = {
         REQUESTED: ['待审核', 'Awaiting review'],
+        AWAITING_RETURN: ['请寄回商品', 'Please return the item'],
+        RETURN_SHIPPED: ['退货运输中', 'Return in transit'],
         PROCESSING: ['退款处理中', 'Refund processing'],
         MANUAL_REQUIRED: ['等待线下退款', 'Awaiting manual refund'],
         SUCCEEDED: ['退款完成', 'Refund completed'],
         REJECTED: ['已驳回', 'Rejected'],
         FAILED: ['处理异常，等待商家核查', 'Requires merchant review']
     };
+    let returnCaseId = null;
     async function load() {
         const data = await request('/current');
         const o = data.order;
@@ -60,7 +63,8 @@
         el('order-title').textContent = text('订单 ', 'Order ') + o.orderNo;
         el('order-status').textContent = en ? o.status : o.statusLabel;
         el('order-total').textContent =
-            o.currency + ' ' + o.total + (Number(o.discountAmount) > 0 ? ' · 优惠 / Discount ' + o.discountAmount : '');
+            o.currency + ' ' + o.total + (Number(o.discountAmount) > 0 ? ' · 优惠 / Discount ' + o.discountAmount : '') +
+            (Number(o.refundedAmount) > 0 ? ' · ' + text('已退款 ', 'Refunded ') + o.refundedAmount : '');
         el('order-address').textContent = o.customerName + ' · ' + o.address;
         el('order-items').replaceChildren();
         o.items.forEach((i) =>
@@ -77,6 +81,7 @@
             item(
                 el('cases'),
                 (states[c.state] ? text(...states[c.state]) : c.state) +
+                    (c.refundAmount ? ' · ' + text('退款 ', 'Refund ') + o.currency + ' ' + c.refundAmount : '') +
                     ' · ' +
                     c.reason +
                     (c.decisionNote ? ' · ' + c.decisionNote : '') +
@@ -92,8 +97,19 @@
                         .join('\n')
             )
         );
-        const active = data.cases.some((c) => c.state !== 'REJECTED');
-        el('after-sales').hidden = active || !['PLACED', 'PAID', 'SHIPPED', 'COMPLETED'].includes(o.status);
+        // 同一时间只能有一个处理中的售后；部分退款完成后，还有可退金额时可以再申请
+        const active = data.cases.some((c) => !['REJECTED', 'SUCCEEDED'].includes(c.state));
+        el('after-sales').hidden =
+            active ||
+            Number(o.refundableAmount) <= 0 ||
+            !['PLACED', 'PAID', 'SHIPPED', 'COMPLETED'].includes(o.status);
+        const waiting = data.cases.find((c) => ['AWAITING_RETURN', 'RETURN_SHIPPED'].includes(c.state));
+        returnCaseId = waiting ? waiting.id : null;
+        el('return-shipment').hidden = !waiting;
+        if (waiting) {
+            el('return-carrier').value = waiting.returnCarrier || '';
+            el('return-tracking').value = waiting.returnTracking || '';
+        }
     }
     el('lookup').addEventListener('submit', (event) => {
         event.preventDefault();
@@ -125,6 +141,17 @@
         run(el('after-sales'), async () => {
             await request('/current/after-sales', 'POST', {reason: el('reason').value});
             feedback(text('申请已提交，等待商家审核。', 'Request submitted for merchant review.'));
+            await load();
+        });
+    });
+    el('return-shipment').addEventListener('submit', (event) => {
+        event.preventDefault();
+        run(el('return-shipment'), async () => {
+            await request('/current/after-sales/' + returnCaseId + '/return', 'POST', {
+                carrier: el('return-carrier').value.trim(),
+                trackingNumber: el('return-tracking').value.trim()
+            });
+            feedback(text('退货物流已提交，商家收到商品后会尽快退款。', 'Return tracking submitted. We will refund once the item arrives.'));
             await load();
         });
     });

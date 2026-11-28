@@ -1,5 +1,6 @@
 package com.javastorm.shop.domain;
 
+import java.math.BigDecimal;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -40,6 +41,67 @@ public class AfterSale {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     private LocalDateTime updatedAt = LocalDateTime.now();
+
+    /** 本次退款金额；为空表示退订单剩余可退的全部金额。 */
+    @Column(precision = 12, scale = 2)
+    private BigDecimal refundAmount;
+
+    /** 需要顾客先把商品寄回，收到后再退款。 */
+    private boolean returnRequired;
+
+    @Column(length = 100)
+    private String returnCarrier;
+
+    @Column(length = 100)
+    private String returnTracking;
+
+    /** 商家确认收到退货的时间。 */
+    private LocalDateTime returnedAt;
+
+    /** 还在处理中（没有驳回、也没有退款完成）。同一订单同时只能有一个处理中的售后单。 */
+    public boolean isOpen() {
+        return !"REJECTED".equals(state) && !"SUCCEEDED".equals(state);
+    }
+
+    public BigDecimal getRefundAmount() {
+        return refundAmount;
+    }
+
+    public void setRefundAmount(BigDecimal refundAmount) {
+        this.refundAmount = refundAmount;
+    }
+
+    public boolean isReturnRequired() {
+        return returnRequired;
+    }
+
+    public void setReturnRequired(boolean returnRequired) {
+        this.returnRequired = returnRequired;
+    }
+
+    public String getReturnCarrier() {
+        return returnCarrier;
+    }
+
+    public void setReturnCarrier(String returnCarrier) {
+        this.returnCarrier = returnCarrier;
+    }
+
+    public String getReturnTracking() {
+        return returnTracking;
+    }
+
+    public void setReturnTracking(String returnTracking) {
+        this.returnTracking = returnTracking;
+    }
+
+    public LocalDateTime getReturnedAt() {
+        return returnedAt;
+    }
+
+    public void setReturnedAt(LocalDateTime returnedAt) {
+        this.returnedAt = returnedAt;
+    }
 
     public Long getId() {
         return id;

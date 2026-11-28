@@ -41,4 +41,6 @@ public interface OrderRepository extends JpaRepository<CustomerOrder, Long> {
     Page<CustomerOrder> findByStatusIn(Collection<OrderStatus> statuses, Pageable pageable);
 
     List<CustomerOrder> findByStatusAndCreatedAtBefore(OrderStatus status, LocalDateTime before);
+
+    List<CustomerOrder> findAllByEmailIgnoreCaseOrderByIdAsc(String email);
 }

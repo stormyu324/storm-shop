@@ -29,7 +29,18 @@ public class OrderItem {
 
     private int quantity;
 
+    /** 已退回并重新入库的数量（部分退货时防止重复入库）。 */
+    private int returnedQuantity;
+
     protected OrderItem() {
+    }
+
+    public int getReturnedQuantity() {
+        return returnedQuantity;
+    }
+
+    public void setReturnedQuantity(int returnedQuantity) {
+        this.returnedQuantity = returnedQuantity;
     }
 
     public OrderItem(Product product, String productName, BigDecimal unitPrice, int quantity) {

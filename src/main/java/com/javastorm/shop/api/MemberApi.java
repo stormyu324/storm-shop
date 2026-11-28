@@ -1,5 +1,9 @@
 package com.javastorm.shop.api;
 
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import java.time.Duration;
+import com.javastorm.shop.service.MemberPrivacyService;
 import com.javastorm.shop.config.LocaleConfig;
 import com.javastorm.shop.domain.MemberAddress;
 import com.javastorm.shop.domain.Product;
@@ -44,12 +48,19 @@ public class MemberApi {
     private final ApiMapper mapper;
     private final VariantService variants;
 
+    private final MemberPrivacyService privacy;
+
+    /** 注销账户前必须在这么长时间内刚验证过邮箱：防止别人用一台没退出登录的电脑注销你的账户。 */
+    static final Duration RECENT_LOGIN = Duration.ofMinutes(30);
+
     public MemberApi(
             MemberService members,
             OrderRepository orders,
             ProductRepository products,
             ApiMapper mapper,
-            VariantService variants) {
+            VariantService variants,
+            MemberPrivacyService privacy) {
+        this.privacy = privacy;
         this.members = members;
         this.orders = orders;
         this.products = products;
@@ -192,5 +203,34 @@ public class MemberApi {
     public void favorite(
             @PathVariable Long productId, @RequestBody Favorite req, HttpSession session) {
         members.favorite(members.require(session).getId(), productId, req.active());
+    }
+
+    /** 下载我的全部个人信息（JSON）。 */
+    @GetMapping("/export")
+    public ResponseEntity<Map<String, Object>> export(HttpSession session) {
+        var member = members.require(session);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"storm-my-data.json\"")
+                .body(privacy.export(member.getId()));
+    }
+
+    public record DeleteAccount(@NotBlank String confirm) {}
+
+    /** 注销账户：body 里 confirm 必须是 DELETE，且 30 分钟内刚验证过邮箱。 */
+    @DeleteMapping("/account")
+    public Map<String, Object> deleteAccount(@Valid @RequestBody DeleteAccount req, HttpServletRequest http) {
+        HttpSession session = http.getSession();
+        var member = members.require(session);
+        if (!"DELETE".equals(req.confirm())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请输入 DELETE 确认注销");
+        }
+        Instant expiry = (Instant) session.getAttribute("memberExpiry");
+        Instant loggedInAt = expiry.minus(Duration.ofDays(1));
+        if (loggedInAt.plus(RECENT_LOGIN).isBefore(Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "为了安全，请重新验证邮箱后再注销 / Please verify your email again");
+        }
+        int anonymized = privacy.delete(member.getId());
+        session.invalidate();
+        return Map.of("deleted", true, "anonymizedOrders", anonymized);
     }
 }

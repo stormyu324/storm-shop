@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -178,7 +179,7 @@ public class PayPalPaymentGateway implements PaymentGateway {
     }
 
     @Override
-    public RefundResult refund(CustomerOrder order, String requestId, String refundId) {
+    public RefundResult refund(CustomerOrder order, BigDecimal amount, String requestId, String refundId) {
         requireEnabled();
         if (refundId != null && !refundId.isBlank()) {
             JsonNode res = getJson("/v2/payments/refunds/" + refundId);
@@ -193,7 +194,7 @@ public class PayPalPaymentGateway implements PaymentGateway {
         Map<String, Object> body = Map.of(
                 "amount", Map.of(
                         "currency_code", order.getCurrency().name(),
-                        "value", order.getTotal().setScale(2, RoundingMode.HALF_UP).toPlainString()
+                        "value", amount.setScale(2, RoundingMode.HALF_UP).toPlainString()
                 )
         );
         JsonNode res = postJson("/v2/payments/captures/" + captureId + "/refund", body,

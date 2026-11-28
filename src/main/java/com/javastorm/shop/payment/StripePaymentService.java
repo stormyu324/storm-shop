@@ -99,7 +99,7 @@ public class StripePaymentService {
     }
 
     public record RefundState(String id, String status) {}
-    public RefundState refund(CustomerOrder order, String requestId, String refundId) {
+    public RefundState refund(CustomerOrder order, BigDecimal amount, String requestId, String refundId) {
         requireEnabled();
         try {
             Refund refund;
@@ -112,7 +112,7 @@ public class StripePaymentService {
                     throw new BusinessException("支付信息与订单不一致，请核查");
                 }
                 var params = RefundCreateParams.builder()
-                        .setPaymentIntent(session.getPaymentIntent()).setAmount(toMinorUnits(order.getTotal()))
+                        .setPaymentIntent(session.getPaymentIntent()).setAmount(toMinorUnits(amount))
                         .putMetadata("after_sale_id", requestId).build();
                 var options = RequestOptions.builder()
                         .setIdempotencyKey("storm-refund-" + order.getOrderNo() + "-" + requestId).build();

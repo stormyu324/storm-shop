@@ -43,7 +43,11 @@ public interface PaymentGateway {
         return false;
     }
 
-    RefundResult refund(CustomerOrder order, String requestId, String refundId);
+    /**
+     * 退款 amount（可以小于订单金额，即部分退款）。refundId 不为空时只查询这笔退款的结果。
+     * requestId 每笔售后退款唯一，用作支付平台的幂等键，重复调用不会重复退款。
+     */
+    RefundResult refund(CustomerOrder order, java.math.BigDecimal amount, String requestId, String refundId);
 
     record CheckoutResult(String sessionId, String url) {
     }

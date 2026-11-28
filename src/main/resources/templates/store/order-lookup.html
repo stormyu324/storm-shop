@@ -21,8 +21,14 @@
         <ul id="order-items"></ul><p id="shipment"></p>
         <a id="tracking" target="_blank" rel="noopener noreferrer" hidden th:text="${en} ? 'Track shipment' : '查看物流'"></a>
         <h2 th:text="${en} ? 'After-sales history' : '售后处理记录'"></h2><ul id="cases"></ul>
+        <form id="return-shipment" hidden>
+            <p class="muted" th:text="${en} ? 'Please ship the item back, then enter the return tracking number here.' : '请把商品寄回，寄出后在这里填写退货物流单号，商家收到后退款。'"></p>
+            <div class="field"><label for="return-carrier" th:text="${en} ? 'Carrier' : '快递公司'"></label><input id="return-carrier" required maxlength="100"></div>
+            <div class="field"><label for="return-tracking" th:text="${en} ? 'Tracking number' : '退货单号'"></label><input id="return-tracking" required maxlength="100"></div>
+            <button type="submit" th:text="${en} ? 'Submit return tracking' : '提交退货物流'"></button>
+        </form>
         <form id="after-sales">
-            <div class="field"><label for="reason" th:text="${en} ? 'Reason for full-order refund or support' : '整单退款或售后原因'"></label><textarea id="reason" required maxlength="1000" rows="3"></textarea></div>
+            <div class="field"><label for="reason" th:text="${en} ? 'Reason for refund or support (full or partial)' : '退款或售后原因（可退全部或部分）'"></label><textarea id="reason" required maxlength="1000" rows="3"></textarea></div>
             <button type="submit" th:text="${en} ? 'Submit request' : '提交售后申请'"></button>
         </form>
         <div class="actions" style="margin-top:18px">

@@ -140,7 +140,7 @@ class ScanFindingsTest {
         TransactionTemplate other = new TransactionTemplate(transactionManager);
         other.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         List<Exception> lockErrors = new ArrayList<>();
-        when(stripe.refund(any(), any(), isNull())).thenAnswer(call -> {
+        when(stripe.refund(any(), any(), any(), isNull())).thenAnswer(call -> {
             // Stripe 响应期间，后台对这个订单和售后单的操作不应被锁住
             try {
                 other.executeWithoutResult(status -> {

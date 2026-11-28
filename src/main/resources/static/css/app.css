@@ -160,6 +160,9 @@ button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
     background: #fff; color: var(--text-2); border: 1px solid var(--border-strong); box-shadow: var(--shadow-sm);
 }
 .btn.ghost:hover, button.ghost:hover { color: var(--primary); border-color: rgba(59,130,246,.45); background: #fff; box-shadow: var(--shadow-sm); }
+/* 危险操作（注销账户等）：红色，避免和普通按钮混淆 */
+button.danger, .btn.danger { background: #dc2626; border-color: #dc2626; color: #fff; }
+button.danger:hover, .btn.danger:hover { background: #b91c1c; border-color: #b91c1c; }
 .btn.small, button.small { padding: 5px 13px; font-size: .84rem; }
 button.link {
     background: none; border: 0; padding: 0; color: var(--primary); box-shadow: none; font-weight: 500;

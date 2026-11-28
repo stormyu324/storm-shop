@@ -1,5 +1,8 @@
 package com.javastorm.shop.service;
 
+import com.javastorm.shop.domain.OrderItem;
+import java.util.Map;
+import java.math.BigDecimal;
 import com.javastorm.shop.domain.AfterSale;
 import com.javastorm.shop.domain.AfterSaleHistory;
 import com.javastorm.shop.domain.CustomerOrder;
@@ -57,6 +60,13 @@ public class OrderCareService {
 
     public record HistoryView(String state, String note, LocalDateTime createdAt) {}
 
+    /**
+     * 售后单状态：REQUESTED 待审核 → （需要退货时）AWAITING_RETURN 等顾客寄回 → RETURN_SHIPPED 顾客已寄出
+     * → PROCESSING 自动退款中 / MANUAL_REQUIRED 需人工线下退款 → SUCCEEDED 已退款；
+     * 也可能 REJECTED 已驳回、FAILED 退款失败（可重新批准）。
+     *
+     * @param refundAmount 本次退款金额；为空表示退剩余全部
+     */
     public record CaseView(
             Long id,
             String reason,
@@ -64,7 +74,12 @@ public class OrderCareService {
             String decisionNote,
             LocalDateTime createdAt,
             LocalDateTime updatedAt,
-            List<HistoryView> history) {}
+            List<HistoryView> history,
+            BigDecimal refundAmount,
+            boolean returnRequired,
+            String returnCarrier,
+            String returnTracking,
+            LocalDateTime returnedAt) {}
 
     public List<CaseView> cases(Long orderId) {
         return cases.findByOrderIdOrderByIdDesc(orderId).stream()
@@ -79,7 +94,12 @@ public class OrderCareService {
                                         a.getUpdatedAt(),
                                         history.findByCaseIdOrderByIdAsc(a.getId()).stream()
                                                 .map(h -> new HistoryView(h.getState(), h.getNote(), h.getCreatedAt()))
-                                                .toList()))
+                                                .toList(),
+                                        a.getRefundAmount(),
+                                        a.isReturnRequired(),
+                                        a.getReturnCarrier(),
+                                        a.getReturnTracking(),
+                                        a.getReturnedAt()))
                 .toList();
     }
 
@@ -96,7 +116,7 @@ public class OrderCareService {
     }
 
     private boolean active(AfterSale a) {
-        return !"REJECTED".equals(a.getState());
+        return a.isOpen();
     }
 
     @Transactional
@@ -148,8 +168,11 @@ public class OrderCareService {
                 .contains(order.getStatus())) {
             throw new BusinessException("当前订单状态不允许申请售后");
         }
+        if (order.getRefundableAmount().signum() <= 0) {
+            throw new BusinessException("订单金额已全部退款");
+        }
         if (cases.findByOrderIdOrderByIdDesc(id).stream().anyMatch(this::active)) {
-            throw new BusinessException("该订单已有售后申请");
+            throw new BusinessException("该订单已有处理中的售后申请");
         }
         AfterSale a = new AfterSale();
         a.setOrderId(id);
@@ -162,14 +185,28 @@ public class OrderCareService {
 
     @Transactional
     public void decide(Long orderId, Long id, String action, String note) {
+        decide(orderId, id, action, note, null, false, Map.of());
+    }
+
+    /**
+     * 商家审核售后单。
+     *
+     * @param amount        APPROVE 时的退款金额，为空表示退剩余全部；不能超过订单剩余可退金额
+     * @param requireReturn APPROVE 时是否要求顾客先寄回商品，收到后（RECEIVE）再退款
+     * @param restock       APPROVE（不需退货时）或 RECEIVE 时要重新入库的商品：订单明细 id → 数量
+     */
+    @Transactional
+    public void decide(Long orderId, Long id, String action, String note, BigDecimal amount, boolean requireReturn,
+                       Map<Long, Integer> restock) {
         CustomerOrder order = locked(orderId);
         AfterSale a =
                 cases
                         .lock(id)
                         .filter(c -> c.getOrderId().equals(orderId))
                         .orElseThrow(() -> new BusinessException("售后申请不存在"));
+        String detail = note;
         if ("REJECT".equals(action)) {
-            if (!"REQUESTED".equals(a.getState())) {
+            if (!Set.of("REQUESTED", "AWAITING_RETURN", "RETURN_SHIPPED").contains(a.getState())) {
                 throw new BusinessException("当前申请不能驳回");
             }
             if (note == null || note.isBlank()) {
@@ -180,17 +217,29 @@ public class OrderCareService {
             if (!Set.of("REQUESTED", "FAILED").contains(a.getState())) {
                 throw new BusinessException("当前申请不能批准");
             }
-            if (order.getStatus() == OrderStatus.REFUNDED) {
-                throw new BusinessException("订单已退款");
+            if (order.getStatus() == OrderStatus.REFUNDED || order.getRefundableAmount().signum() <= 0) {
+                throw new BusinessException("订单已全部退款");
             }
-            a.setState(order.getPaymentSessionId() == null ? "MANUAL_REQUIRED" : "PROCESSING");
-            if (a.isProviderFailed()) {
-                a.setRefundGeneration(a.getRefundGeneration() + 1);
-                a.setRefundId(null);
-                a.setProviderFailed(false);
+            if ("REQUESTED".equals(a.getState())) {
+                a.setRefundAmount(checkedAmount(order, amount));
+            } else if (amount != null) {
+                // 退款失败后重新批准时可以改金额
+                a.setRefundAmount(checkedAmount(order, amount));
             }
-            a.setAttempts(0);
-            a.setNextAttempt(LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS));
+            if ("REQUESTED".equals(a.getState()) && requireReturn) {
+                a.setReturnRequired(true);
+                a.setState("AWAITING_RETURN");
+            } else {
+                detail = join(note, restock(order, restock));
+                startRefund(order, a);
+            }
+        } else if ("RECEIVE".equals(action)) {
+            if (!Set.of("AWAITING_RETURN", "RETURN_SHIPPED").contains(a.getState())) {
+                throw new BusinessException("当前申请不是等待退货状态");
+            }
+            a.setReturnedAt(LocalDateTime.now());
+            detail = join("已收到退货" + (note == null || note.isBlank() ? "" : "：" + note), restock(order, restock));
+            startRefund(order, a);
         } else if ("CONFIRM_MANUAL".equals(action)) {
             if (!"MANUAL_REQUIRED".equals(a.getState()) || note == null || note.isBlank()) {
                 throw new BusinessException("请核实线下退款并填写退款凭据");
@@ -199,37 +248,139 @@ public class OrderCareService {
         } else {
             throw new BusinessException("未知审核操作");
         }
-        a.setDecisionNote(note);
+        a.setDecisionNote(detail);
         a.setUpdatedAt(LocalDateTime.now());
         record(a);
         mail.order(
                 order,
                 "AFTER_SALE_" + a.getId() + "_" + a.getState(),
-                "售后进度 / After-sales: " + a.getState() + (note == null ? "" : "\n" + note));
+                "售后进度 / After-sales: " + stateText(a) + (detail == null ? "" : "\n" + detail));
+    }
+
+    /** 顾客把退货寄出后填写物流单号。 */
+    @Transactional
+    public CaseView submitReturn(Long orderId, Long caseId, String carrier, String trackingNumber) {
+        CustomerOrder order = locked(orderId);
+        AfterSale a = cases.lock(caseId)
+                .filter(c -> c.getOrderId().equals(orderId))
+                .orElseThrow(() -> new BusinessException("售后申请不存在"));
+        if (!Set.of("AWAITING_RETURN", "RETURN_SHIPPED").contains(a.getState())) {
+            throw new BusinessException("这个售后申请不需要寄回商品");
+        }
+        a.setReturnCarrier(carrier.trim());
+        a.setReturnTracking(trackingNumber.trim());
+        a.setState("RETURN_SHIPPED");
+        a.setDecisionNote("顾客已寄回：" + carrier.trim() + " / " + trackingNumber.trim());
+        a.setUpdatedAt(LocalDateTime.now());
+        record(a);
+        mail.order(order, "AFTER_SALE_" + a.getId() + "_RETURN_SHIPPED_" + trackingNumber.trim(),
+                "已收到您的退货物流信息，商家收到商品后会尽快退款 / Return tracking received: "
+                        + carrier.trim() + " " + trackingNumber.trim());
+        return cases(orderId).stream().filter(c -> c.id().equals(caseId)).findFirst().orElseThrow();
+    }
+
+    private static BigDecimal checkedAmount(CustomerOrder order, BigDecimal amount) {
+        BigDecimal refundable = order.getRefundableAmount();
+        if (amount == null) {
+            return refundable;
+        }
+        if (amount.signum() <= 0 || amount.scale() > 2) {
+            throw new BusinessException("退款金额必须大于 0，最多两位小数");
+        }
+        if (amount.compareTo(refundable) > 0) {
+            throw new BusinessException("退款金额不能超过剩余可退的 " + refundable.toPlainString());
+        }
+        return amount;
+    }
+
+    /** 进入退款：在线付款的订单自动原路退回，线下收款的等商家线下退款后确认。 */
+    private void startRefund(CustomerOrder order, AfterSale a) {
+        a.setState(order.getPaymentSessionId() == null ? "MANUAL_REQUIRED" : "PROCESSING");
+        if (a.isProviderFailed()) {
+            a.setRefundGeneration(a.getRefundGeneration() + 1);
+            a.setRefundId(null);
+            a.setProviderFailed(false);
+        }
+        a.setAttempts(0);
+        a.setNextAttempt(LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS));
+    }
+
+    /** 把退回的商品重新入库（每件商品累计退回数量不超过购买数量）；返回记录用的说明。 */
+    private String restock(CustomerOrder order, Map<Long, Integer> restock) {
+        if (restock == null || restock.isEmpty()) {
+            return null;
+        }
+        List<String> done = new java.util.ArrayList<>();
+        for (Map.Entry<Long, Integer> e : restock.entrySet()) {
+            int qty = e.getValue() == null ? 0 : e.getValue();
+            if (qty <= 0) {
+                continue;
+            }
+            OrderItem item = order.getItems().stream().filter(i -> i.getId().equals(e.getKey())).findFirst()
+                    .orElseThrow(() -> new BusinessException("订单里没有这件商品"));
+            int left = item.getQuantity() - item.getReturnedQuantity();
+            if (qty > left) {
+                throw new BusinessException("「" + item.getProductName() + "」最多还能退回入库 " + left + " 件");
+            }
+            if (item.getProductId() != null) {
+                products.restock(item.getProductId(), qty);
+            }
+            item.setReturnedQuantity(item.getReturnedQuantity() + qty);
+            done.add(item.getProductName() + " × " + qty);
+        }
+        return done.isEmpty() ? null : "已重新入库：" + String.join("、", done);
+    }
+
+    private static String join(String a, String b) {
+        if (a == null || a.isBlank()) {
+            return b;
+        }
+        return b == null ? a : a + "\n" + b;
+    }
+
+    private static String stateText(AfterSale a) {
+        return switch (a.getState()) {
+            case "AWAITING_RETURN" -> "请寄回商品，并在订单查询页填写退货物流单号 / Please return the item and submit the tracking number";
+            case "RETURN_SHIPPED" -> "已收到退货物流信息 / Return in transit";
+            case "PROCESSING" -> "退款处理中 / Refund in progress";
+            case "MANUAL_REQUIRED" -> "商家将线下退款 / Refund will be made offline";
+            case "SUCCEEDED" -> "退款已完成 / Refund completed";
+            case "REJECTED" -> "申请未通过 / Request declined";
+            default -> a.getState();
+        };
     }
 
     private void finish(CustomerOrder order, AfterSale a) {
-        if (order.getStatus() != OrderStatus.REFUNDED) {
-            // Unshipped orders can return inventory immediately. Physical returns require inspection.
+        BigDecimal amount = a.getRefundAmount() == null ? order.getRefundableAmount()
+                : a.getRefundAmount().min(order.getRefundableAmount());
+        order.setRefundedAmount(order.getRefundedAmount().add(amount));
+        boolean full = order.getRefundableAmount().signum() <= 0;
+        if (full && order.getStatus() != OrderStatus.REFUNDED) {
+            // 没发货就全额退款：剩下没退回入库的商品全部回到库存。已发货的要等实物退回后由商家确认入库
             if (order.getShippedAt() == null
                     && !Set.of(OrderStatus.CANCELLED, OrderStatus.SHIPPED, OrderStatus.COMPLETED)
                             .contains(order.getStatus())) {
                 order.getItems().forEach(i -> {
-                    if (i.getProductId() != null) {
-                        products.restock(i.getProductId(), i.getQuantity());
+                    int left = i.getQuantity() - i.getReturnedQuantity();
+                    if (i.getProductId() != null && left > 0) {
+                        products.restock(i.getProductId(), left);
+                        i.setReturnedQuantity(i.getQuantity());
                     }
                 });
             }
             coupons.release(order);
             order.setStatus(OrderStatus.REFUNDED);
         }
+        a.setRefundAmount(amount);
         a.setState("SUCCEEDED");
         a.setUpdatedAt(LocalDateTime.now());
-        mail.order(order, "REFUNDED", "退款已完成 / Refund completed.");
+        mail.order(order, "REFUNDED_" + a.getId(), (full ? "退款已完成 / Refund completed: " : "部分退款已完成 / Partial refund completed: ")
+                + amount.toPlainString() + " " + order.getCurrency());
     }
 
     /** 退款任务的快照：在数据库锁之外调用 Stripe 所需的信息。order 已脱离事务，只读其中的普通字段。 */
-    private record RefundJob(Long caseId, Long orderId, int generation, String key, String refundId, CustomerOrder order) {
+    private record RefundJob(Long caseId, Long orderId, int generation, String key, String refundId, CustomerOrder order,
+                             BigDecimal amount) {
     }
 
     /**
@@ -249,7 +400,7 @@ public class OrderCareService {
             try {
                 PaymentGateway gateway = gateways.forSession(job.order().getPaymentSessionId())
                         .orElseThrow(() -> new BusinessException("无法识别的支付通道"));
-                result = gateway.refund(job.order(), job.key(), job.refundId());
+                result = gateway.refund(job.order(), job.amount(), job.key(), job.refundId());
             } catch (BusinessException e) {
                 // 结果不明确（网络、服务异常），下一步按失败计次，稍后重试前先核对
             }
@@ -269,7 +420,8 @@ public class OrderCareService {
         String key = a.getRefundGeneration() == 0
                 ? a.getId().toString()
                 : a.getId() + "-retry-" + a.getRefundGeneration();
-        return new RefundJob(a.getId(), order.getId(), a.getRefundGeneration(), key, a.getRefundId(), order);
+        BigDecimal amount = a.getRefundAmount() == null ? order.getRefundableAmount() : a.getRefundAmount();
+        return new RefundJob(a.getId(), order.getId(), a.getRefundGeneration(), key, a.getRefundId(), order, amount);
     }
 
     /** result 为 null 表示调用支付平台失败、结果不明确。 */

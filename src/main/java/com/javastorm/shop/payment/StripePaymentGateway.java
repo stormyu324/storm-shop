@@ -59,8 +59,8 @@ public class StripePaymentGateway implements PaymentGateway {
     }
 
     @Override
-    public RefundResult refund(CustomerOrder order, String requestId, String refundId) {
-        StripePaymentService.RefundState state = stripe.refund(order, requestId, refundId);
+    public RefundResult refund(CustomerOrder order, java.math.BigDecimal amount, String requestId, String refundId) {
+        StripePaymentService.RefundState state = stripe.refund(order, amount, requestId, refundId);
         return new RefundResult(state.id(), state.status());
     }
 }
