@@ -7,8 +7,10 @@ set -eu
 
 cd "$(dirname "$0")/.."
 umask 077
-mkdir -p secrets
-chmod 700 secrets
+# 预发布环境用另一个目录：SECRETS_PATH=./secrets-staging ./deploy/init-secrets.sh
+dir=${SECRETS_PATH:-./secrets}
+mkdir -p "$dir"
+chmod 700 "$dir"
 
 random() {
     # 32 位字母数字，不含容易在 URL / 命令行里出问题的符号
@@ -18,7 +20,7 @@ random() {
 create() {
     name=$1
     value=$2
-    file="secrets/$name"
+    file="$dir/$name"
     if [ -e "$file" ]; then
         echo "已存在，跳过：$file"
         return

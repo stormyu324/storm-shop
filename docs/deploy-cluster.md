@@ -65,6 +65,12 @@ docker compose -f docker-compose.cluster.yml up -d --build
 
 第一次要构建镜像、下载依赖，需要几分钟。`docker compose -f docker-compose.cluster.yml ps` 里所有服务都是 `healthy` 就启动好了。
 
+启动后运行冒烟测试，几十秒内检查 HTTPS、两个节点、会话共享、图片共享和监控是否都正常：
+
+```bash
+./deploy/smoke-test.sh https://localhost
+```
+
 ### 5. 换成正式证书（Let's Encrypt，免费）
 
 集群跑起来后：
