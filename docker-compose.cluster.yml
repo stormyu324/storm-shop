@@ -72,6 +72,8 @@ x-shop-secrets: &shop-secrets
     target: METRICS_TOKEN
 
 x-shop-node: &shop-node
+  # 默认用本目录代码构建；正式升级 / 回滚用 GitHub Release 发布的镜像（deploy/upgrade.sh 会写入 .env 的 SHOP_IMAGE）
+  image: ${SHOP_IMAGE:-storm-shop:local}
   build: .
   restart: unless-stopped
   environment: *shop-env

@@ -1,4 +1,6 @@
-# 依赖安全更新：每周检查一次，有新版本或安全漏洞时自动开 PR（CI 通过后再合并）
+# 依赖更新：每周检查，只自动提小版本和补丁更新（CI 通过后合并）。
+# 大版本升级（如 Spring Boot 3 → 4、Java 21 → 25）往往要改代码，不自动提，需要时单独评估、单独升级。
+# 有安全漏洞时 GitHub 仍会提醒（仓库 Security 页的 Dependabot alerts）。
 version: 2
 updates:
   - package-ecosystem: maven
@@ -6,6 +8,9 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       spring:
         patterns: ["org.springframework*"]
@@ -14,11 +19,21 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: monthly
+    ignore:
+      # 基础镜像的 Java 大版本跟着 pom.xml 的 java.version 一起手动升级
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
