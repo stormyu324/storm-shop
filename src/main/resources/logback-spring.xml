@@ -1,9 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     <springProfile name="prod">
+        <!-- 每行一条 JSON：字段 timestamp / level / thread / logger / message / traceId，异常时带 stack_trace；
+             容器把标准输出交给 Docker，再由日志采集（deploy/monitoring）送进 Loki -->
         <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-            <encoder>
-                <pattern>{"timestamp":"%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX}","level":"%level","thread":"%thread","traceId":"%X{traceId:-}","logger":"%logger{36}","message":"%replace(%replace(%msg){'\\','\\\\'}){'"','\"'}%nopex"}%n</pattern>
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <fieldNames>
+                    <timestamp>timestamp</timestamp>
+                    <thread>thread</thread>
+                    <logger>logger</logger>
+                    <version>[ignore]</version>
+                    <levelValue>[ignore]</levelValue>
+                </fieldNames>
+                <includeMdcKeyName>traceId</includeMdcKeyName>
+                <customFields>{"app":"storm-shop"}</customFields>
+                <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                    <maxDepthPerThrowable>40</maxDepthPerThrowable>
+                    <rootCauseFirst>true</rootCauseFirst>
+                </throwableConverter>
             </encoder>
         </appender>
         <root level="INFO">

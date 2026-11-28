@@ -1,5 +1,6 @@
 package com.javastorm.shop.payment;
 
+import com.javastorm.shop.config.ShopMetrics;
 import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.OrderStatus;
 import com.javastorm.shop.payment.StripePaymentService.SessionState;
@@ -9,6 +10,7 @@ import com.javastorm.shop.service.OrderService;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -31,9 +33,17 @@ public class PaymentFlow {
     private final PaymentGatewayRegistry gateways;
     private final OrderService orders;
 
+    private final ShopMetrics metrics;
+
     public PaymentFlow(PaymentGatewayRegistry gateways, OrderService orders) {
+        this(gateways, orders, ShopMetrics.noop());
+    }
+
+    @Autowired
+    public PaymentFlow(PaymentGatewayRegistry gateways, OrderService orders, ShopMetrics metrics) {
         this.gateways = gateways;
         this.orders = orders;
+        this.metrics = metrics;
     }
 
     /** 为刚创建的待付款订单打开默认支付通道（Stripe 优先）；失败时取消订单、退回库存，并把商品放回购物车。 */
@@ -49,6 +59,7 @@ public class PaymentFlow {
             orders.attachPaymentSession(order.getId(), checkout.sessionId());
             return checkout.url();
         } catch (BusinessException e) {
+            metrics.checkoutFailed(provider);
             restoreToCart(cart, orders.cancelUnpaid(order.getOrderNo()));
             throw e;
         }

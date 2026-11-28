@@ -1,0 +1,26 @@
+# Prometheus：每 15 秒抓取两个应用节点的监控指标，按 alerts.yml 的规则判断是否告警，告警交给 Alertmanager 发通知
+global:
+  scrape_interval: 15s
+  evaluation_interval: 30s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  - job_name: storm-shop
+    metrics_path: /actuator/prometheus
+    # 指标需要令牌（secrets/METRICS_TOKEN），应用里由 MetricsTokenFilter 校验
+    authorization:
+      type: Bearer
+      credentials_file: /run/secrets/METRICS_TOKEN
+    static_configs:
+      - targets: ["shop-1:8080", "shop-2:8080"]
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

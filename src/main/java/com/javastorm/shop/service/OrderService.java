@@ -1,5 +1,6 @@
 package com.javastorm.shop.service;
 
+import com.javastorm.shop.config.ShopMetrics;
 import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.OrderItem;
@@ -41,10 +42,12 @@ public class OrderService {
     private final OrderMailService mail;
     private final CouponService coupons;
     private final AfterSaleRepository afterSales;
+    private final ShopMetrics metrics;
 
     public OrderService(ProductRepository products, OrderRepository orders, Pricing pricing,
                         ShippingService shipping, OrderMailService mail, AfterSaleRepository afterSales,
-                        CouponService coupons) {
+                        CouponService coupons, ShopMetrics metrics) {
+        this.metrics = metrics;
         this.coupons = coupons;
         this.afterSales = afterSales;
         this.mail = mail;
@@ -152,6 +155,7 @@ public class OrderService {
         }
         CustomerOrder saved = orders.save(order);
         mail.order(saved, "PLACED", "订单已创建 / Your order was placed.");
+        metrics.orderPlaced(currency.name());
         // 事务提交成功后才清空购物车；提交失败（例如并发抢购导致版本冲突）时顾客的购物车保持不变
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
@@ -190,8 +194,9 @@ public class OrderService {
                 order.setPaidAt(LocalDateTime.now());
                 mail.order(order, "PAID", "付款已确认 / Payment confirmed.");
                 order.setPaymentSessionId(sessionId);
+                metrics.paymentConfirmed(sessionId != null && sessionId.startsWith("paypal:") ? "paypal" : "stripe");
             } else if (order.getStatus() == OrderStatus.CANCELLED && order.getPaidAt() == null) {
-                log.error("订单 {} 已取消但收到了付款（Stripe session {}），请在 Stripe 后台退款", orderNo, sessionId);
+                log.error("订单 {} 已取消但收到了付款（支付会话 {}），请在支付平台后台退款", orderNo, sessionId);
             }
         });
         return found;

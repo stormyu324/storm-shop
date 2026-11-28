@@ -1,0 +1,66 @@
+# 告警规则的单元测试（CI 里用 promtool test rules 运行）：确认该告警时会告警、正常时不会
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{job="storm-shop", instance="shop-1:8080"}'
+        values: "1 0 0 0 0"
+      - series: 'up{job="storm-shop", instance="shop-2:8080"}'
+        values: "1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: ShopNodeDown
+        exp_alerts:
+          - exp_labels: {severity: critical, job: storm-shop, instance: "shop-1:8080"}
+            exp_annotations:
+              summary: "应用节点 shop-1:8080 连不上"
+              description: "Prometheus 2 分钟抓不到这个节点的指标。另一个节点还在时顾客基本无感，但已没有冗余。查看：docker compose -f docker-compose.cluster.yml ps / logs"
+      - eval_time: 4m
+        alertname: ShopAllNodesDown
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'shop_reconciliation_unresolved{instance="shop-1:8080"}'
+        values: "0 2 2 2 2 2 2 2"
+      - series: 'shop_backup_last_success_age_seconds{instance="shop-1:8080"}'
+        values: "100000+60x30"
+    alert_rule_test:
+      - eval_time: 7m
+        alertname: ReconciliationIssues
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations:
+              summary: "有 2 条支付对账异常未处理"
+              description: "可能有已取消但已收款、或已发货但未收款的订单。到后台「支付对账」页处理"
+      - eval_time: 15m
+        alertname: BackupTooOld
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations:
+              summary: "超过 26 小时没有成功备份"
+              description: "查看：docker compose -f docker-compose.cluster.yml logs backup"
+
+  - interval: 1m
+    input_series:
+      - series: 'shop_circuit_breaker_open{instance="shop-1:8080", service="paypal"}'
+        values: "0 1 1 1"
+      - series: 'shop_circuit_breaker_open{instance="shop-1:8080", service="claude"}'
+        values: "1 1 1 1"
+      - series: 'shop_backup_last_success_age_seconds{instance="shop-1:8080"}'
+        values: "3600 3660 3720 3780"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: PaymentProviderCircuitOpen
+        exp_alerts:
+          - exp_labels: {severity: critical, service: paypal}
+            exp_annotations:
+              summary: "paypal 支付连续失败，已暂停调用"
+              description: "顾客暂时无法用 paypal 付款。检查支付平台状态页和密钥是否过期"
+      - eval_time: 3m
+        alertname: BackupTooOld
+        exp_alerts: []
