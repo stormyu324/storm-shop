@@ -68,7 +68,7 @@
                 <form th:action="@{/}" method="get">
                     <input type="hidden" name="q" th:value="${q}">
                     <input type="hidden" name="category" th:value="${category}">
-                    <select name="sort" onchange="this.form.submit()">
+                    <select name="sort" data-autosubmit>
                         <option value="new" th:selected="${sort == 'new'}" th:text="#{sort.new}">最新上架</option>
                         <option value="price_asc" th:selected="${sort == 'price_asc'}" th:text="#{sort.priceAsc}">价格从低到高</option>
                         <option value="price_desc" th:selected="${sort == 'price_desc'}" th:text="#{sort.priceDesc}">价格从高到低</option>

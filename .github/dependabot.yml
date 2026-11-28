@@ -1,0 +1,24 @@
+# 依赖安全更新：每周检查一次，有新版本或安全漏洞时自动开 PR（CI 通过后再合并）
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      spring:
+        patterns: ["org.springframework*"]
+  - package-ecosystem: npm
+    directory: /admin-ui
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly

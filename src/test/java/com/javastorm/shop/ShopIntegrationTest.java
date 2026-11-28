@@ -42,8 +42,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -191,11 +191,21 @@ class ShopIntegrationTest {
         mvc.perform(post("/cart/add").session(session).param("productId", p.getId().toString()).with(csrf()))
                 .andExpect(redirectedUrl("/products/" + p.getId()));
         mvc.perform(get("/cart").session(session)).andExpect(content().string(containsString("商品WEB-1")));
-        mvc.perform(post("/checkout").session(session).with(csrf())
+        var placed = mvc.perform(post("/checkout").session(session).with(csrf())
                         .param("customerName", "张三").param("phone", "13800000000").param("address", "北京市").param("country", "CN"))
-                .andExpect(redirectedUrl("/order-success"));
+                .andExpect(redirectedUrl("/order-success"))
+                .andReturn();
         assertThat(orders.count()).isEqualTo(1);
         assertThat(products.findById(p.getId()).orElseThrow().getStock()).isEqualTo(1);
+
+        // 跳转过去的成功页要能打开并显示订单号（以前这个页面被删掉了，顾客下单成功却看到“页面不存在”）
+        String orderNo = orders.findAll().get(0).getOrderNo();
+        mvc.perform(get("/order-success").session(session)
+                        .flashAttrs(placed.getFlashMap()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(orderNo)));
+        // 别人直接打开这个链接（没有 flash）回到首页，不能凭链接看到别人的订单
+        mvc.perform(get("/order-success").session(new MockHttpSession())).andExpect(redirectedUrl("/"));
     }
 
     private Product product(String sku, int stock, ProductStatus status) {

@@ -7,7 +7,7 @@
     <div class="card center">
         <h1 th:text="#{error.title}">操作未完成</h1>
         <p th:text="${message}">出错了</p>
-        <p class="actions" style="justify-content:center"><a href="javascript:history.back()" class="btn" th:text="#{error.back}">返回上一页</a> <a th:href="@{/}" class="btn ghost" th:text="#{error.home}">回到首页</a></p>
+        <p class="actions" style="justify-content:center"><a th:href="@{/}" data-history-back class="btn" th:text="#{error.back}">返回上一页</a> <a th:href="@{/}" class="btn ghost" th:text="#{error.home}">回到首页</a></p>
     </div>
 </main>
 </body>

@@ -77,15 +77,7 @@
 </main>
 <footer th:replace="~{fragments/layout :: footer}"></footer>
 <script th:if="${aiShopping}" th:src="@{/js/ai-shop.js}" defer></script>
-<script>
-    document.querySelectorAll('.gallery .thumbs img').forEach(function (img) {
-        img.addEventListener('click', function () {
-            document.getElementById('mainImage').src = img.src;
-            document.querySelectorAll('.gallery .thumbs img').forEach(function (i) { i.classList.remove('active'); });
-            img.classList.add('active');
-        });
-    });
-</script>
+<script th:src="@{/js/product-gallery.js}" defer></script>
 <script th:src="@{/js/member-checkout.js}" defer></script>
 </body>
 </html>

@@ -265,11 +265,17 @@ SPRING_PROFILES_ACTIVE=prod ADMIN_PASSWORD=你的强密码 java -jar target/shop
 
 - 后台密码必须至少 8 位且不是默认的 `admin123`，否则**拒绝启动**（开发模式只打印警告）
 - 不写入示例商品、开启模板缓存、不开放 H2 的 TCP 端口、错误页不显示异常细节
-- 正式运营建议换成 MySQL（见“换成 MySQL”）；数据库表结构由程序启动时自动创建和更新
+- 正式运营建议换成 MySQL（见“换成 MySQL”）；数据库表结构由 Flyway 迁移脚本管理（`src/main/resources/db/migration`），启动时自动升级
+- 会话 Cookie 只通过 HTTPS 发送，**正式环境必须配置 HTTPS**（临时用 HTTP 访问时设 `SESSION_COOKIE_SECURE=false`）
 - 部署在 Nginx 等反向代理后面时，程序从 `X-Forwarded-For` 读取顾客的真实 IP（验证码、AI 导购、下单的限流按每位顾客计算），
   只信任本机和内网地址的代理。Nginx 里加上 `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` 和
   `proxy_set_header X-Forwarded-Proto $scheme;`。代理在公网上（例如 CDN 直接连到本程序）时，
   启动参数加 `--server.tomcat.remoteip.trusted-proxies=代理地址的正则`，否则所有顾客会共用代理的限流额度
+
+### 集群部署（服务器长期营业）
+
+一台服务器上跑 Nginx（HTTPS）+ 2 个应用节点 + MySQL + Redis，密码和密钥用文件管理、不写在环境变量里。
+步骤、HTTPS 证书申请和续期、更换密钥的方法见 [docs/deploy-cluster.md](docs/deploy-cluster.md)。
 
 ## 测试
 

@@ -37,7 +37,7 @@
                     <td>
                         <form th:action="@{/cart/update}" method="post" class="actions">
                             <input type="hidden" name="productId" th:value="${line.product.id}">
-                            <input class="qty" type="number" name="quantity" th:value="${line.quantity}" min="0" max="99" onchange="this.form.submit()">
+                            <input class="qty" type="number" name="quantity" th:value="${line.quantity}" min="0" max="99" data-autosubmit>
                         </form>
                     </td>
                     <td class="num" th:text="${@pricing.format(line.subtotal, cart.currency)}"></td>

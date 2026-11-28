@@ -9,3 +9,10 @@ backups/
 .DS_Store
 
 config.env
+
+# 集群部署的密钥和证书（见 docs/deploy-cluster.md），绝不能提交
+secrets/
+deploy/certs/*.pem
+deploy/letsencrypt/
+deploy/certbot-www/*
+!deploy/certbot-www/.gitkeep
