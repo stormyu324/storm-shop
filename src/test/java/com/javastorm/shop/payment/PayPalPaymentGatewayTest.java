@@ -133,7 +133,7 @@ class PayPalPaymentGatewayTest {
 
         // 4) 退款
         order.setPaymentSessionId(checkout.sessionId());
-        PaymentGateway.RefundResult refund = gateway.refund(order, "case-1", null);
+        PaymentGateway.RefundResult refund = gateway.refund(order, order.getTotal(), "case-1", null);
         assertThat(refund.id()).isEqualTo("REF-888");
         assertThat(refund.status()).isEqualTo("succeeded");
 

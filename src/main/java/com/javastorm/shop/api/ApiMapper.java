@@ -84,10 +84,10 @@ public class ApiMapper {
         return new AdminOrder(o.getId(), o.getOrderNo(), o.getStatus(), o.getStatus().getLabel(),
                 nextStatuses(o), o.getCurrency(), o.getItemsTotal(), o.getShippingFee(), o.getTotal(),
                 o.getCustomerName(), o.getPhone(), o.getCountry(), o.getAddress(), o.getNote(),
-                o.getItems().stream().map(i -> new OrderLine(i.getProductId(), i.getProductName(), i.getSku(),
-                        i.getUnitPrice(), i.getQuantity(), i.getSubtotal())).toList(),
+                o.getItems().stream().map(i -> new OrderLine(i.getId(), i.getProductId(), i.getProductName(), i.getSku(),
+                        i.getUnitPrice(), i.getQuantity(), i.getSubtotal(), i.getReturnedQuantity())).toList(),
                 o.getCreatedAt(), o.getPaidAt(), o.getEmail(), o.getCarrier(), o.getTrackingNumber(),
                 o.getTrackingUrl(), o.getShippedAt(), o.getDiscountAmount(), o.getCouponCode(),
-                o.canConfirmOfflinePayment());
+                o.canConfirmOfflinePayment(), o.getRefundedAmount(), o.getRefundableAmount());
     }
 }

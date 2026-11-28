@@ -95,6 +95,10 @@ public class CustomerOrder {
 
     private Boolean couponReleased;
 
+    /** 累计已退款金额（支持多次部分退款）；等于订单总额时订单变为“已退款”。 */
+    @Column(nullable = false, precision = 12, scale = 2)
+    private BigDecimal refundedAmount = BigDecimal.ZERO;
+
     @PrePersist
     void onCreate() {
         createdAt = LocalDateTime.now();
@@ -210,6 +214,19 @@ public class CustomerOrder {
     /** 商品金额（不含运费）。 */
     public BigDecimal getItemsTotal() {
         return total.add(getDiscountAmount()).subtract(getShippingFee());
+    }
+
+    public BigDecimal getRefundedAmount() {
+        return refundedAmount == null ? BigDecimal.ZERO : refundedAmount;
+    }
+
+    public void setRefundedAmount(BigDecimal refundedAmount) {
+        this.refundedAmount = refundedAmount;
+    }
+
+    /** 还能退多少钱。 */
+    public BigDecimal getRefundableAmount() {
+        return total.subtract(getRefundedAmount()).max(BigDecimal.ZERO);
     }
 
     /** 设置运费并计入订单总额；只能在下单时调用一次。 */

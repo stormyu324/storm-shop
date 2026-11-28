@@ -92,8 +92,9 @@ public final class AdminDtos {
     public record ImageUpload(List<String> urls) {
     }
 
-    public record OrderLine(Long productId, String productName, String sku, BigDecimal unitPrice, int quantity,
-                            BigDecimal subtotal) {
+    /** @param id 订单明细 id（退货入库时用）；returnedQuantity 已退回入库的数量 */
+    public record OrderLine(Long id, Long productId, String productName, String sku, BigDecimal unitPrice, int quantity,
+                            BigDecimal subtotal, int returnedQuantity) {
     }
 
     public record AdminOrder(
@@ -103,7 +104,9 @@ public final class AdminDtos {
             String customerName, String phone, String country, String address, String note,
             List<OrderLine> items, LocalDateTime createdAt, LocalDateTime paidAt,
             String email, String carrier, String trackingNumber, String trackingUrl, LocalDateTime shippedAt,
-            BigDecimal discountAmount, String couponCode, boolean canConfirmOfflinePayment) {
+            BigDecimal discountAmount, String couponCode, boolean canConfirmOfflinePayment,
+            @Schema(description = "累计已退款金额") BigDecimal refundedAmount,
+            @Schema(description = "还能退款的金额") BigDecimal refundableAmount) {
     }
 
     public record StatusChange(@NotNull OrderStatus status) {

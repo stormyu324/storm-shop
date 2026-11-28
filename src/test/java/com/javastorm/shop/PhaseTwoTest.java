@@ -454,6 +454,7 @@ class PhaseTwoTest {
         Mockito.when(
                         stripe.refund(
                                 ArgumentMatchers.any(),
+                                ArgumentMatchers.any(),
                                 ArgumentMatchers.eq(request.id().toString()),
                                 ArgumentMatchers.isNull()))
                 .thenReturn(new StripePaymentService.RefundState("re_phase2", "succeeded"));

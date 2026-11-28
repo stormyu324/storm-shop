@@ -118,14 +118,14 @@ class CustomerOrderCareTest {
         assertThatThrownBy(() -> care.request(o.getId(), "Duplicate"))
                 .isInstanceOf(BusinessException.class);
         care.decide(o.getId(), request.id(), "APPROVE", "");
-        when(stripe.refund(any(), eq(request.id().toString()), isNull()))
+        when(stripe.refund(any(), any(), eq(request.id().toString()), isNull()))
                 .thenReturn(new StripePaymentService.RefundState("re_care", "succeeded"));
         care.processRefunds();
         care.processRefunds();
         assertThat(orders.findById(o.getId()).orElseThrow().getStatus())
                 .isEqualTo(OrderStatus.REFUNDED);
         assertThat(products.findById(product).orElseThrow().getStock()).isEqualTo(10);
-        verify(stripe, times(1)).refund(any(), eq(request.id().toString()), isNull());
+        verify(stripe, times(1)).refund(any(), any(), eq(request.id().toString()), isNull());
         assertThatThrownBy(() -> care.decide(o.getId(), request.id(), "APPROVE", ""))
                 .isInstanceOf(BusinessException.class);
     }
@@ -221,7 +221,7 @@ class CustomerOrderCareTest {
         CustomerOrder o = order(OrderStatus.PAID, true);
         var request = care.request(o.getId(), "Refund pending test");
         care.decide(o.getId(), request.id(), "APPROVE", "");
-        when(stripe.refund(any(), eq(request.id().toString()), isNull()))
+        when(stripe.refund(any(), any(), eq(request.id().toString()), isNull()))
                 .thenReturn(new StripePaymentService.RefundState("re_pending", "pending"));
         care.processRefunds();
         assertThat(orders.findById(o.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAID);
@@ -229,7 +229,7 @@ class CustomerOrderCareTest {
         assertThat(pending.getRefundId()).isEqualTo("re_pending");
         pending.setNextAttempt(LocalDateTime.now().minusMinutes(1));
         cases.saveAndFlush(pending);
-        when(stripe.refund(any(), eq(request.id().toString()), eq("re_pending")))
+        when(stripe.refund(any(), any(), eq(request.id().toString()), eq("re_pending")))
                 .thenReturn(new StripePaymentService.RefundState("re_pending", "succeeded"));
         care.processRefunds();
         assertThat(orders.findById(o.getId()).orElseThrow().getStatus())

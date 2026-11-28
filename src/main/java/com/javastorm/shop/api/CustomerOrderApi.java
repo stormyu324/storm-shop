@@ -1,5 +1,6 @@
 package com.javastorm.shop.api;
 
+import org.springframework.web.bind.annotation.PathVariable;
 import com.javastorm.shop.repository.OrderRepository;
 import com.javastorm.shop.service.OrderAccessService;
 import com.javastorm.shop.service.OrderCareService;
@@ -48,6 +49,9 @@ public class CustomerOrderApi {
             @Pattern(regexp = "[0-9]{6}") @NotNull String code) {}
 
     public record Reason(@NotBlank @Size(max = 1000) String reason) {}
+
+    public record ReturnShipment(@NotBlank @Size(max = 100) String carrier,
+                                 @NotBlank @Size(max = 100) String trackingNumber) {}
 
     @GetMapping("/session")
     public Map<String, String> session(CsrfToken csrf) {
@@ -109,6 +113,13 @@ public class CustomerOrderApi {
     @PostMapping("/current/after-sales")
     public OrderCareService.CaseView request(@Valid @RequestBody Reason req, HttpSession session) {
         return care.request(authorized(session), req.reason());
+    }
+
+    /** 商家要求退货时，顾客寄出后填写物流单号。 */
+    @PostMapping("/current/after-sales/{caseId}/return")
+    public OrderCareService.CaseView submitReturn(@PathVariable Long caseId, @Valid @RequestBody ReturnShipment req,
+                                                  HttpSession session) {
+        return care.submitReturn(authorized(session), caseId, req.carrier(), req.trackingNumber());
     }
 
     @DeleteMapping("/session")

@@ -13,4 +13,6 @@ public interface MemberChallengeRepository extends JpaRepository<MemberChallenge
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from MemberChallenge c where c.id=:id")
     Optional<MemberChallenge> lock(@Param("id") String id);
+
+    void deleteByEmailIgnoreCase(String email);
 }

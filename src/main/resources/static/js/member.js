@@ -181,5 +181,17 @@
             fill({});
         })
         .catch((e) => feedback(e.message));
+    el('member-delete').addEventListener('submit', (event) => {
+        event.preventDefault();
+        run(async () => {
+            if (el('member-delete-confirm').value.trim() !== 'DELETE') {
+                throw new Error('请输入 DELETE 确认 / Type DELETE to confirm');
+            }
+            if (!window.confirm('确定注销账户吗？此操作不能恢复。 / Delete your account? This cannot be undone.')) return;
+            const result = await request('/account', 'DELETE', {confirm: 'DELETE'});
+            alert('账户已注销，' + result.anonymizedOrders + ' 个历史订单的个人信息已抹去。 / Your account has been deleted.');
+            location.href = '/';
+        });
+    });
     load().catch((e) => feedback(e.message));
 })();

@@ -1,6 +1,7 @@
 package com.javastorm.shop.service;
 
 import com.javastorm.shop.config.ShopMetrics;
+import com.javastorm.shop.domain.AfterSale;
 import com.javastorm.shop.domain.Currency;
 import com.javastorm.shop.domain.CustomerOrder;
 import com.javastorm.shop.domain.OrderItem;
@@ -255,7 +256,7 @@ public class OrderService {
         CustomerOrder order = orders.findForUpdate(orderId).orElse(null);
         if (order == null || order.getStatus() != OrderStatus.PLACED || order.getPaidAt() != null
                 || afterSales.findByOrderIdOrderByIdDesc(orderId).stream()
-                        .anyMatch(a -> !"REJECTED".equals(a.getState()))) {
+                        .anyMatch(AfterSale::isOpen)) {
             return false;
         }
         for (OrderItem item : order.getItems()) {
@@ -291,7 +292,7 @@ public class OrderService {
     public void changeStatus(Long orderId, OrderStatus status) {
         CustomerOrder order = orders.findForUpdate(orderId).orElseThrow(() -> new BusinessException("订单不存在"));
         if (afterSales.findByOrderIdOrderByIdDesc(orderId).stream()
-                .anyMatch(a -> !"REJECTED".equals(a.getState()))) {
+                .anyMatch(AfterSale::isOpen)) {
             throw new BusinessException("请先处理该订单的售后申请");
         }
         if (order.getStatus() == status) {

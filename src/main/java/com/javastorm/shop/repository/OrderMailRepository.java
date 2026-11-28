@@ -20,4 +20,6 @@ public interface OrderMailRepository extends JpaRepository<OrderMail, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select m from OrderMail m where m.id = :id")
     Optional<OrderMail> lock(@Param("id") Long id);
+
+    void deleteByRecipientIgnoreCase(String recipient);
 }
