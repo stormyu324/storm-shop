@@ -17,7 +17,7 @@ echo "== 1/4 校验文件完整性"
 (cd "$backup" && sha256sum -c SHA256SUMS)
 
 name="storm-restore-drill-$$"
-pw=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 24)
+pw=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 24)
 cleanup() {
     docker rm -f "$name" > /dev/null 2>&1 || true
 }

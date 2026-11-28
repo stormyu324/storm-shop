@@ -33,6 +33,8 @@ inside() {
 echo "== HTTPS 和安全头（$base）"
 http_base=$(echo "$base" | sed -e 's#^https://#http://#' -e 's#:[0-9]*$##')
 check "HTTP 跳转到 HTTPS" "curl $curl_opts -o /dev/null -w '%{http_code} %{redirect_url}' '$http_base/' | grep -q '^301 https://'"
+# headers 在下面 check 的命令字符串里使用（eval 执行），shellcheck 看不出来
+# shellcheck disable=SC2034
 headers=$(curl $curl_opts -D - -o /dev/null "$base/")
 check "首页 200" "echo \"\$headers\" | head -1 | grep -q ' 200'"
 check "HSTS" "echo \"\$headers\" | grep -qi '^strict-transport-security: max-age='"

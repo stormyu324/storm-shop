@@ -14,7 +14,8 @@ chmod 700 "$dir"
 
 random() {
     # 32 位字母数字，不含容易在 URL / 命令行里出问题的符号
-    LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32
+    # head 取够 32 个字符就关掉管道，tr 会报一句 Broken pipe，无害，不显示
+    LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 32
 }
 
 create() {
