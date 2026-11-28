@@ -82,11 +82,12 @@ public class OrderSubmissionGuard {
 
     @Autowired
     public OrderSubmissionGuard(@Value("${shop.redis.enabled:false}") boolean redisEnabled,
+                                @Value("${shop.orders.per-ip-limit:" + PER_ADDRESS + "}") int perAddress,
                                 ObjectProvider<StringRedisTemplate> redisProvider,
                                 ObjectProvider<ObjectMapper> objectMapperProvider) {
         this(Clock.systemUTC(),
                 redisEnabled ? redisProvider.getIfAvailable() : null,
-                objectMapperProvider.getIfAvailable(ObjectMapper::new));
+                objectMapperProvider.getIfAvailable(ObjectMapper::new), perAddress);
     }
 
     public OrderSubmissionGuard() {
@@ -98,10 +99,15 @@ public class OrderSubmissionGuard {
     }
 
     OrderSubmissionGuard(Clock clock, StringRedisTemplate redis, ObjectMapper objectMapper) {
+        this(clock, redis, objectMapper, PER_ADDRESS);
+    }
+
+    /** @param perAddress 同一 IP 10 分钟内最多下单次数；只在压测环境调大（ORDER_PER_IP_LIMIT），正式环境保持默认 */
+    OrderSubmissionGuard(Clock clock, StringRedisTemplate redis, ObjectMapper objectMapper, int perAddress) {
         this.clock = clock;
         this.redis = redis;
         this.objectMapper = objectMapper;
-        this.limiter = new RateLimiter(PER_ADDRESS, Integer.MAX_VALUE, clock, "order-submit", redis);
+        this.limiter = new RateLimiter(perAddress, Integer.MAX_VALUE, clock, "order-submit", redis);
     }
 
     public <T> T submit(String clientId, String address, String key, String fingerprint, Duration ttl, Supplier<T> action) {
