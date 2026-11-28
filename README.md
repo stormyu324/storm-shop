@@ -278,11 +278,13 @@ SPRING_PROFILES_ACTIVE=prod ADMIN_PASSWORD=你的强密码 java -jar target/shop
 步骤、HTTPS 证书申请和续期、更换密钥的方法见 [docs/deploy-cluster.md](docs/deploy-cluster.md)。
 上线后的自动备份与恢复演练、监控告警、查日志和告警处理手册见 [docs/operations.md](docs/operations.md)。
 升级前先在预发布环境验证、冒烟测试（`deploy/smoke-test.sh`）和压测（`tools/LoadTest.java`）见 [docs/staging.md](docs/staging.md)。
+版本发布、不停业升级和回滚（`deploy/upgrade.sh`）、数据库迁移规则见 [docs/release.md](docs/release.md)；每个版本的改动见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 测试
 
 ```bash
-./mvnw test
+./mvnw test      # 测试 + 覆盖率报告（target/site/jacoco/index.html）
+./mvnw verify    # 再加上覆盖率下限检查，CI 用这个
 ```
 
 默认用内存数据库。在 MySQL 上跑全部测试（先建一个空的 `shop_test` 库，建法同上）：

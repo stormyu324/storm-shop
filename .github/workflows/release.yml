@@ -1,0 +1,80 @@
+# 发布：推送 v1.2.3 这样的版本标签时，跑完整测试，打包 JAR 和 Docker 镜像（推到 GitHub 容器仓库 ghcr.io），
+# 并创建 GitHub Release（附 JAR，发布说明从 CHANGELOG.md 对应版本一节摘出）。步骤见 docs/release.md
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Version from tag
+        id: version
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          awk -v v="$version" '
+            /^## \[/ { found = index($0, "[" v "]") > 0; next }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "CHANGELOG.md 里没有 [$version] 这一节，请先补上再打标签" >&2
+            exit 1
+          fi
+
+      - name: Test and package
+        run: |
+          chmod +x mvnw
+          ./mvnw -B -q versions:set -DnewVersion="${{ steps.version.outputs.version }}" -DgenerateBackupPoms=false
+          ./mvnw -B verify
+
+      - name: Build and push Docker image
+        run: |
+          image="${{ steps.version.outputs.image }}"
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker build \
+            --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+            --label "org.opencontainers.image.version=${{ steps.version.outputs.version }}" \
+            -t "$image:${{ steps.version.outputs.tag }}" -t "$image:latest" .
+          docker push "$image:${{ steps.version.outputs.tag }}"
+          docker push "$image:latest"
+          echo "镜像：\`$image:${{ steps.version.outputs.tag }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            cat release-notes.md
+            echo
+            echo "### 部署"
+            echo
+            echo '```bash'
+            echo "./deploy/upgrade.sh ${{ steps.version.outputs.tag }}"
+            echo '```'
+            echo
+            echo "Docker 镜像：\`${{ steps.version.outputs.image }}:${{ steps.version.outputs.tag }}\`"
+          } > release-body.md
+          gh release create "${{ steps.version.outputs.tag }}" \
+            target/shop-${{ steps.version.outputs.version }}.jar \
+            --title "${{ steps.version.outputs.tag }}" --notes-file release-body.md

@@ -19,11 +19,30 @@ jobs:
           java-version: "21"
           cache: maven
 
-      - name: Run Maven test suite
-        run: chmod +x mvnw && ./mvnw test -B
+      # verify = 测试 + 打包 + 覆盖率检查（低于 pom.xml 里的下限时失败）
+      - name: Test, package and check coverage
+        run: chmod +x mvnw && ./mvnw verify -B
 
-      - name: Build JAR package
-        run: ./mvnw package -DskipTests -B
+      - name: Coverage summary
+        if: always()
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import csv
+          rows = list(csv.DictReader(open("target/site/jacoco/jacoco.csv")))
+          def ratio(k):
+              c = sum(int(r[k + "_COVERED"]) for r in rows)
+              m = sum(int(r[k + "_MISSED"]) for r in rows)
+              return c / (c + m) * 100
+          print(f"### 测试覆盖率\n\n代码行 {ratio('LINE'):.1f}% · 分支 {ratio('BRANCH'):.1f}%")
+          PY
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: target/site/jacoco/
+          retention-days: 14
 
   docker:
     runs-on: ubuntu-latest

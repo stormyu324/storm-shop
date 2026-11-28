@@ -16,6 +16,7 @@ secrets-*/
 backups-*/
 .env
 .env.staging
+.deployed-versions
 deploy/certs/*.pem
 deploy/certs-*/
 deploy/letsencrypt/
